@@ -1,0 +1,13 @@
+# macOS
+.DS_Store
+
+# Build artifacts (NickelHook + plugin)
+*.o
+*.d
+*.moc
+*.moc.d
+*.moc.o
+hook/nhplugin.json
+hook/libreadingstats.so
+hook/Kobo.tgz
+hook/KoboRoot.tgz
