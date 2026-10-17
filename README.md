@@ -31,6 +31,7 @@ Das Mod hookt:
 | `EventEngine::endReadingSession()` | `_ZN11EventEngine17endReadingSessionE…` | Kobo-Session-Ende auf Tolino ausführen |
 | `ReadingView::supportsReadingStats()` | `_ZNK11ReadingView20supportsReadingStatsEv` | Statistik für normale EPUBs zulassen |
 | `ReadingView::hasValidReadingStats()` | `_ZN11ReadingView20hasValidReadingStatsEv` | Tolino-only TOC/Spine-Prüfung entschärfen |
+| `ReadingView::updateWordCounts()` | `_ZN11ReadingView16updateWordCountsEv` | Wortzählung für normale EPUBs nachrüsten (siehe unten) |
 | `FeatureSettings::bookSpecificStatsEnabled()` | `_ZN15FeatureSettings24bookSpecificStatsEnabledEv` | Per-Book-Statistik forcieren |
 
 Die drei Kennzahlen „Stunden gelesen", „Minuten pro Sitzung" und „Seiten pro
@@ -54,19 +55,37 @@ aufgelöst. Die Hooks rufen zuerst die Originalfunktion auf und greifen nur
 ein, wenn Nickel selbst `false` liefert; dadurch bleibt bestehendes
 Verhalten (z. B. kepub auf Kobo) unverändert.
 
+## Wortzählung für normale EPUBs
+
+`ReadingView::updateWordCounts()` ist das kepub-only-Gatter, das die
+Wortzählung pro Kapitel erzeugt — die Grundlage für das Kapitel-Balkendiagramm
+und die „verbleibende Zeit"-Schätzung. Es kehrt für alles, was kein kepub ist,
+sofort um. Der Hook ruft zuerst die Originalfunktion auf (kepub und Instapaper
+laufen unverändert) und zählt danach für ein sideloaded EPUB die Wörter selbst:
+
+1. MIME-Typ prüfen (`application/epub+zip`) und Fixed-Layout ausschließen.
+2. Den Dateipfad des EPUBs aus der Content-ID (`file://…`) ableiten.
+3. Das EPUB-Zip mit `QZipReader` öffnen, die OPF lokalisieren
+   (`META-INF/container.xml`, Fallback `*.opf`) und die Spine-Reihenfolge
+   parsen (Manifest + Spine).
+4. Pro Spine-Datei das XHTML lesen, Tags/Skripte/Styles entfernen und die
+   Wörter zählen.
+5. Die `QList<int>` über `ReadingView::gotWordCounts()` an Nickel liefern.
+
+Damit füllt sich auch bei normalen EPUBs das Kapitel-Balkendiagramm und die
+zeitbasierten Schätzungen werden plausibel. Randnotiz: Bücher, die aus einer
+einzigen großen HTML-Datei bestehen, ergeben genau einen Balken — das ist
+korrekt, keine leere Anzeige.
+
 ## Grenzen („robust" heißt hier: sauber degradieren, nicht abstürzen)
 
-Die Kapitelgrößen (Balkendiagramm) und die „verbleibende Zeit"-Schätzungen
-brauchen Wortzählungen pro Kapitel, die `KepubBookWordCounter` nur für
-kepubs erzeugt. Normale EPUBs werden vom Adobe-Renderer (RMSDK) dargestellt
-und haben diese Daten nicht. Für EPUBs zeigt die Statistik daher:
-
-- funktioniert: Fortschritt in %, gelesene Zeit, umgeblätterte Seiten
-- leer/0: Kapitel-Balkendiagramm und zeitbasierte Schätzungen
-
-Das entspricht exakt dem Verhalten eines echten Kobo mit sideloaded EPUBs.
-Die Wortzählung für EPUBs nachzurüsten wäre eine eigene Feature-Entwicklung
-(EPUB-HTML parsen), nicht Teil dieses Mods.
+Fixed-Layout-Inhalte (Fixed-Layout-EPUBs, PDF, Comics) bleiben bewusst
+ausgeschlossen — dafür wird `ReadingView::isFixedLayout()` via `dlsym`
+aufgelöst. Die Wortzählung wird nur angestoßen, wenn alle dlsym-Ziele
+vorhanden sind; fehlt etwas, wird sie still übersprungen statt zu crashen.
+Die Hooks rufen zuerst die Originalfunktion auf und greifen nur ein, wenn
+Nickel selbst nichts liefert; dadurch bleibt bestehendes Verhalten
+(z. B. kepub auf Kobo) unverändert.
 
 ## Bauen
 

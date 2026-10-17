@@ -39,14 +39,22 @@
 
 #include <NickelHook.h>
 
+#include <QByteArray>
+#include <QList>
+#include <QString>
+
+#include "wordcount.h"
+
 // Opaque forward decls (we only ever pass pointers through).
 typedef void ReadingView;
 typedef void Device;
 typedef void FeatureSettings;
+typedef void Content;
 
 // Original symbols, filled by NickelHook (.out) before our hooks run.
 static bool (*ReadingView__supportsReadingStats)(ReadingView *);
 static bool (*ReadingView__hasValidReadingStats)(ReadingView *);
+static void (*ReadingView__updateWordCounts)(ReadingView *);
 static bool (*Device__supportsReadingLife)(Device *);
 static bool (*Device__supportsActivityInMore)(Device *);
 static bool (*Device__isTolino)(Device *);
@@ -58,6 +66,9 @@ static bool (*EventEngine__endReadingSession)(void *, void *, void *, void *);
 static bool (*ReadingView__isFixedLayout)(ReadingView *);
 static int  (*Device__getDeviceClass)(Device *);
 static bool (*Device__isParentalControlEnabled)(Device *);
+static QByteArray (*Content__getMimeType)(const Content *);
+static QString    (*Content__getId)(const Content *, const QString &);
+static void       (*ReadingView__gotWordCounts)(ReadingView *, const QList<int> &);
 
 // While set, isTolino() reports false so the reading-session tracking runs its
 // Kobo path on a Tolino. Scoped to the start/endReadingSession calls only.
@@ -106,6 +117,13 @@ static struct nh_hook NickelReadingStatsHook[] = {
         .desc    = "Drop the Tolino-only TOC/spine validation for reading stats",
     },
     {
+        .sym     = "_ZN11ReadingView16updateWordCountsEv",
+        .sym_new = "_nh_ReadingView__updateWordCounts",
+        .lib     = "libnickel.so.1.0.0",
+        .out     = nh_symoutptr(ReadingView__updateWordCounts),
+        .desc    = "Compute word counts for plain epubs (chapter bars / time estimates)",
+    },
+    {
         .sym     = "_ZN15FeatureSettings24bookSpecificStatsEnabledEv",
         .sym_new = "_nh_FeatureSettings__bookSpecificStatsEnabled",
         .lib     = "libnickel.so.1.0.0",
@@ -144,6 +162,21 @@ static struct nh_dlsym NickelReadingStatsDlsym[] = {
         .name = "_ZNK6Device24isParentalControlEnabledEv",
         .out  = nh_symoutptr(Device__isParentalControlEnabled),
         .desc = "Preserve the parental-control check for the Activity entry",
+    },
+    {
+        .name = "_ZNK7Content11getMimeTypeEv",
+        .out  = nh_symoutptr(Content__getMimeType),
+        .desc = "Detect plain epubs for the word-count retrofit",
+    },
+    {
+        .name = "_ZNK7Content5getIdERK7QString",
+        .out  = nh_symoutptr(Content__getId),
+        .desc = "Resolve the epub file path for the word-count retrofit",
+    },
+    {
+        .name = "_ZN11ReadingView13gotWordCountsERK5QListIiE",
+        .out  = nh_symoutptr(ReadingView__gotWordCounts),
+        .desc = "Deliver the computed word counts to the reading view",
     },
     {0},
 };
@@ -241,6 +274,43 @@ _nh_ReadingView__hasValidReadingStats(ReadingView *view) {
         return true;
     }
     return reading_stats_supported(view);
+}
+
+// ReadingView::updateWordCounts() is the kepub-only gate that computes the
+// per-chapter word counts behind the chapter bars and time estimates. It
+// early-returns for anything that is not a kepub. We run the original (kepub
+// and instapaper are handled there) and then, for a sideloaded plain epub,
+// count the words ourselves and deliver them through gotWordCounts().
+extern "C" __attribute__((visibility("default"))) void
+_nh_ReadingView__updateWordCounts(ReadingView *view) {
+    if (ReadingView__updateWordCounts) {
+        ReadingView__updateWordCounts(view);
+    }
+
+    if (!Content__getMimeType || !Content__getId || !ReadingView__gotWordCounts) {
+        return;
+    }
+    if (ReadingView__isFixedLayout && ReadingView__isFixedLayout(view)) {
+        return;  // fixed-layout content has no meaningful chapter bars
+    }
+
+    // The Volume/Content the original reads is embedded at view + 0x94.
+    const Content *content = reinterpret_cast<const Content *>(
+        reinterpret_cast<const char *>(view) + 0x94);
+
+    if (Content__getMimeType(content) != QByteArray("application/epub+zip")) {
+        return;  // kepub and other types are handled by nickel itself
+    }
+
+    const QString id = Content__getId(content, QString());
+    if (!id.startsWith(QLatin1String("file://"))) {
+        return;  // not a sideloaded file (store content uses the kepub path)
+    }
+
+    const QList<int> counts = count_epub_words(id.mid(7));  // strip "file://"
+    if (!counts.isEmpty()) {
+        ReadingView__gotWordCounts(view, counts);
+    }
 }
 
 extern "C" __attribute__((visibility("default"))) bool
