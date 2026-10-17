@@ -26,9 +26,20 @@ Das Mod hookt:
 |---|---|---|
 | `Device::supportsReadingLife()` | `_ZNK6Device19supportsReadingLifeEv` | Feature auf Tolino wieder aktivieren |
 | `Device::supportsActivityInMore()` | `_ZNK6Device22supportsActivityInMoreEv` | „Aktivität"-Eintrag im Mehr-Menü auf Tolino anzeigen |
+| `Device::isTolino()` | `_ZNK6Device8isTolinoEv` | meldet nur während der Session-Erfassung „kein Tolino" (siehe unten) |
+| `EventEngine::startReadingSession()` | `_ZN11EventEngine19startReadingSessionE…` | Kobo-Session-Start auf Tolino ausführen |
+| `EventEngine::endReadingSession()` | `_ZN11EventEngine17endReadingSessionE…` | Kobo-Session-Ende auf Tolino ausführen |
 | `ReadingView::supportsReadingStats()` | `_ZNK11ReadingView20supportsReadingStatsEv` | Statistik für normale EPUBs zulassen |
 | `ReadingView::hasValidReadingStats()` | `_ZN11ReadingView20hasValidReadingStatsEv` | Tolino-only TOC/Spine-Prüfung entschärfen |
 | `FeatureSettings::bookSpecificStatsEnabled()` | `_ZN15FeatureSettings24bookSpecificStatsEnabledEv` | Per-Book-Statistik forcieren |
+
+Die drei Kennzahlen „Stunden gelesen", „Minuten pro Sitzung" und „Seiten pro
+Minute" speist die Lesesitzungs-Erfassung (`startReadingSession`/
+`endReadingSession`). Die prüfen intern `isTolino()` und überspringen auf dem
+Tolino die komplette Kobo-Erfassung. Der Hook führt sie mit einem
+`g_force_kobo_session`-Flag aus, das `isTolino()` nur während dieser zwei
+Aufrufe `false` liefern lässt — der Rest des Geräts (Tolino-Shop/-Cloud/-DRM)
+behält sein normales Verhalten.
 
 Wichtig: Der „Aktivität"-Eintrag hängt an `supportsActivityInMore()`, das auf
 Tolino wegen `isTolino()` sofort `false` liefert — unabhängig von
