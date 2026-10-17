@@ -25,9 +25,17 @@ Das Mod hookt:
 | Hook | Symbol | Wirkung |
 |---|---|---|
 | `Device::supportsReadingLife()` | `_ZNK6Device19supportsReadingLifeEv` | Feature auf Tolino wieder aktivieren |
+| `Device::supportsActivityInMore()` | `_ZNK6Device22supportsActivityInMoreEv` | „Aktivität"-Eintrag im Mehr-Menü auf Tolino anzeigen |
 | `ReadingView::supportsReadingStats()` | `_ZNK11ReadingView20supportsReadingStatsEv` | Statistik für normale EPUBs zulassen |
 | `ReadingView::hasValidReadingStats()` | `_ZN11ReadingView20hasValidReadingStatsEv` | Tolino-only TOC/Spine-Prüfung entschärfen |
 | `FeatureSettings::bookSpecificStatsEnabled()` | `_ZN15FeatureSettings24bookSpecificStatsEnabledEv` | Per-Book-Statistik forcieren |
+
+Wichtig: Der „Aktivität"-Eintrag hängt an `supportsActivityInMore()`, das auf
+Tolino wegen `isTolino()` sofort `false` liefert — unabhängig von
+`supportsReadingLife()`. Deshalb blieb der Eintrag zunächst versteckt. Der
+Hook führt die ursprüngliche Prüfung (`!isTolino() && deviceClass == 2 &&
+!ParentalControl`) erneut aus, lässt aber nur die `isTolino()`-Sperre weg;
+Geräteklasse und Jugendschutz bleiben erhalten.
 
 Fixed-Layout-Inhalte (Fixed-Layout-EPUBs, PDF, Comics) bleiben bewusst
 ausgeschlossen — dafür wird `ReadingView::isFixedLayout()` via `dlsym`

@@ -19,6 +19,9 @@
  *
  * The hooks below:
  *   - force supportsReadingLife() to true  -> restore the feature on Tolino
+ *   - re-enable supportsActivityInMore() on Tolino -> the "Activity" entry
+ *     in the More menu (it is gated by isTolino() directly, independently
+ *     of supportsReadingLife(), which is why it stayed hidden)
  *   - relax supportsReadingStats()/hasValidReadingStats() to accept any
  *     reflowable (non-fixed-layout) book -> plain epubs work too
  *   - force FeatureSettings::bookSpecificStatsEnabled() to true
@@ -39,10 +42,13 @@ typedef void FeatureSettings;
 static bool (*ReadingView__supportsReadingStats)(ReadingView *);
 static bool (*ReadingView__hasValidReadingStats)(ReadingView *);
 static bool (*Device__supportsReadingLife)(Device *);
+static bool (*Device__supportsActivityInMore)(Device *);
 static bool (*FeatureSettings__bookSpecificStatsEnabled)(FeatureSettings *);
 
 // Resolved via dlsym.
 static bool (*ReadingView__isFixedLayout)(ReadingView *);
+static int  (*Device__getDeviceClass)(Device *);
+static bool (*Device__isParentalControlEnabled)(Device *);
 
 static struct nh_info NickelReadingStats = {
     .name = "NickelReadingStats",
@@ -57,6 +63,13 @@ static struct nh_hook NickelReadingStatsHook[] = {
         .lib     = "libnickel.so.1.0.0",
         .out     = nh_symoutptr(Device__supportsReadingLife),
         .desc    = "Re-enable the reading stats feature on Tolino devices",
+    },
+    {
+        .sym     = "_ZNK6Device22supportsActivityInMoreEv",
+        .sym_new = "_nh_Device__supportsActivityInMore",
+        .lib     = "libnickel.so.1.0.0",
+        .out     = nh_symoutptr(Device__supportsActivityInMore),
+        .desc    = "Show the Activity entry in the More menu on Tolino devices",
     },
     {
         .sym     = "_ZNK11ReadingView20supportsReadingStatsEv",
@@ -88,6 +101,16 @@ static struct nh_dlsym NickelReadingStatsDlsym[] = {
         .out  = nh_symoutptr(ReadingView__isFixedLayout),
         .desc = "Keep fixed-layout content excluded from stats",
     },
+    {
+        .name = "_ZNK6Device14getDeviceClassEv",
+        .out  = nh_symoutptr(Device__getDeviceClass),
+        .desc = "Preserve the device-class check for the Activity entry",
+    },
+    {
+        .name = "_ZNK6Device24isParentalControlEnabledEv",
+        .out  = nh_symoutptr(Device__isParentalControlEnabled),
+        .desc = "Preserve the parental-control check for the Activity entry",
+    },
     {0},
 };
 
@@ -103,6 +126,28 @@ static bool reading_stats_supported(ReadingView *view) {
 extern "C" __attribute__((visibility("default"))) bool
 _nh_Device__supportsReadingLife(Device *device) {
     (void)device;
+    return true;
+}
+
+// Device::supportsActivityInMore() gates the "Activity" entry in the More
+// menu. On Tolino it returns false immediately because of isTolino(); the
+// original logic is:
+//     if (isTolino()) return false;
+//     if (getDeviceClass() != 2) return false;
+//     return !isParentalControlEnabled();
+// We re-run the same checks but drop the isTolino() early-out, so the
+// device-class and parental-control guards are preserved.
+extern "C" __attribute__((visibility("default"))) bool
+_nh_Device__supportsActivityInMore(Device *device) {
+    if (Device__supportsActivityInMore && Device__supportsActivityInMore(device)) {
+        return true;
+    }
+    if (Device__getDeviceClass && Device__getDeviceClass(device) != 2) {
+        return false;
+    }
+    if (Device__isParentalControlEnabled && Device__isParentalControlEnabled(device)) {
+        return false;
+    }
     return true;
 }
 
