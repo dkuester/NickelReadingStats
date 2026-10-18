@@ -61,6 +61,7 @@ static bool (*Device__isTolino)(Device *);
 static bool (*FeatureSettings__bookSpecificStatsEnabled)(FeatureSettings *);
 static bool (*EventEngine__startReadingSession)(void *, void *, void *, void *);
 static bool (*EventEngine__endReadingSession)(void *, void *, void *, void *);
+static void (*EventEngine__fireEventSlot)(void *, void *, void *, void *);
 
 // Resolved via dlsym.
 static bool (*ReadingView__isFixedLayout)(ReadingView *);
@@ -143,6 +144,13 @@ static struct nh_hook NickelReadingStatsHook[] = {
         .lib     = "libnickel.so.1.0.0",
         .out     = nh_symoutptr(EventEngine__endReadingSession),
         .desc    = "Run the Kobo session-end path on Tolino devices",
+    },
+    {
+        .sym     = "_ZN11EventEngine13fireEventSlotE10QByteArray6Volume4QMapI7QString8QVariantE",
+        .sym_new = "_nh_EventEngine__fireEventSlot",
+        .lib     = "libnickel.so.1.0.0",
+        .out     = nh_symoutptr(EventEngine__fireEventSlot),
+        .desc    = "Run the Kobo event dispatch (page turns) on Tolino devices",
     },
     {0},
 };
@@ -235,6 +243,24 @@ _nh_EventEngine__endReadingSession(void *engine, void *volume, void *state, void
     bool ret = EventEngine__endReadingSession(engine, volume, state, map);
     g_force_kobo_session = prev;
     return ret;
+}
+
+// fireEventSlot() is the Qt slot that dispatches every reading-life event
+// (page turns, session start/end, book finished) to the social-event handlers
+// that update the Activity metrics. It also checks isTolino() and bails out on
+// a Tolino, which is why "pages per minute" stays at 0 even though the session
+// start/end above record the time. Run it with isTolino() forced to false so
+// page turns are counted. (The analytics half of the slot is still gated by
+// the user's analytics/privacy permission.)
+extern "C" __attribute__((visibility("default"))) void
+_nh_EventEngine__fireEventSlot(void *engine, void *name, void *volume, void *map) {
+    if (!EventEngine__fireEventSlot) {
+        return;
+    }
+    bool prev = g_force_kobo_session;
+    g_force_kobo_session = true;
+    EventEngine__fireEventSlot(engine, name, volume, map);
+    g_force_kobo_session = prev;
 }
 
 // Device::supportsActivityInMore() gates the "Activity" entry in the More
