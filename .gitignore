@@ -11,3 +11,4 @@ hook/nhplugin.json
 hook/libreadingstats.so
 hook/Kobo.tgz
 hook/KoboRoot.tgz
+hook/tests/test_wordcount
