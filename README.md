@@ -101,3 +101,28 @@ Voraussetzung: Docker-Image `strayrose/nickeltc:latest`
 `hook/Kobo.tgz` nach `.kobo/` auf dem Gerät legen und Nickel neu starten.
 Deinstallieren: leere Datei `readingstats_uninstall` im Geräteroot ablegen
 und Nickel neu starten.
+
+## Quellen & Danksagung
+
+Der Mod steht auf den Schultern folgender Projekte:
+
+- **NickelHook** (MIT, Copyright (c) 2020–2025 Patrick Gaskin) — das
+  Hook-Framework, auf dem der Mod aufbaut. Verwendet als Git-Submodul in der
+  `qt6-support`-Fork von **Nico Verbruggen** (`nicoverbruggen/NickelHook`), die
+  Qt-6-Unterstützung ergänzt.
+- **Qt 6.5.2** (The Qt Project / The Qt Company) — `QZipReader` (private API,
+  LGPL-3.0/GPL-2.0/GPL-3.0) zum Lesen der EPUB-Zip-Archive sowie
+  `QXmlStreamReader` und `QRegularExpression` fürs Parsen und Zählen.
+- **strayrose/nickeltc** — Docker-Cross-Compile-Toolchain
+  (`arm-kobo-linux-gnueabihf`, GCC 11.5, Qt 6.5.2), mit der das Hook gebaut wird.
+- **Kobo/Tolino-Firmware** (`libnickel.so.1.0.0`, Tolino 5.18) — das Ziel-Binary.
+  Die internen Klassen (`Device`, `ReadingView`, `Content`, `EventEngine`) wurden
+  per Symbolanalyse und Capstone-Disassembly reverse-engineered.
+
+## KI-Unterstützung
+
+Dieses Mod wurde mit Hilfe einer KI reverse-engineered und gebaut: die Analyse
+der Firmware-Gatter, das Disassemblieren der Zielklassen und die
+Implementierung der Hooks entstanden im Dialog mit einem KI-Assistenten
+(Hermes Agent, Nous Research). Fachliche Kontrolle, On-Device-Tests und
+Freigabe lagen bei einem Menschen.
