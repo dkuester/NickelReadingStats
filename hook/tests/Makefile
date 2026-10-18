@@ -3,7 +3,9 @@
 # toolchain, so it runs on any dev machine and in CI.
 
 CXX      ?= c++
-CXXFLAGS ?= -std=c++17 -O2 -Wall -Wextra
+# -fPIC: Debian/Ubuntu build Qt5 with -reduce-relocations, which refuses to
+# link into a non-PIC (-fPIE) binary. -fPIC is a harmless no-op elsewhere.
+CXXFLAGS ?= -std=c++17 -O2 -Wall -Wextra -fPIC
 
 # Prefer Qt6Core, fall back to Qt5Core.
 QT_CORE  := $(shell pkg-config --exists Qt6Core && echo Qt6Core || echo Qt5Core)
