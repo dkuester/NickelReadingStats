@@ -36,6 +36,7 @@ Das Mod hookt:
 | `ReadingView::supportsReadingStats()` | `_ZNK11ReadingView20supportsReadingStatsEv` | Statistik für normale EPUBs zulassen |
 | `ReadingView::hasValidReadingStats()` | `_ZN11ReadingView20hasValidReadingStatsEv` | Tolino-only TOC/Spine-Prüfung entschärfen |
 | `ReadingView::updateWordCounts()` | `_ZN11ReadingView16updateWordCountsEv` | Wortzählung für normale EPUBs nachrüsten (siehe unten) |
+| `ReadingView::mergedTOCAndSpineIndex()` | `_ZN11ReadingView22mergedTOCAndSpineIndexEv` | Rohen Spine-Index verwenden, damit gelesene Kapitel hervorgehoben werden |
 | `FeatureSettings::bookSpecificStatsEnabled()` | `_ZN15FeatureSettings24bookSpecificStatsEnabledEv` | Per-Book-Statistik forcieren |
 
 Die drei Kennzahlen „Stunden gelesen", „Minuten pro Sitzung" und „Seiten pro

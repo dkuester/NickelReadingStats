@@ -55,6 +55,7 @@ typedef void Content;
 static bool (*ReadingView__supportsReadingStats)(ReadingView *);
 static bool (*ReadingView__hasValidReadingStats)(ReadingView *);
 static void (*ReadingView__updateWordCounts)(ReadingView *);
+static int  (*ReadingView__mergedTOCAndSpineIndex)(ReadingView *);
 static bool (*Device__supportsReadingLife)(Device *);
 static bool (*Device__supportsActivityInMore)(Device *);
 static bool (*Device__isTolino)(Device *);
@@ -71,6 +72,7 @@ static bool (*Device__isParentalControlEnabled)(Device *);
 static QByteArray &(*Content__getMimeType)(const Content *);
 static QString    (*Content__getId)(const Content *, const QString &);
 static void       (*ReadingView__gotWordCounts)(ReadingView *, const QList<int> &);
+static int        (*ReadingView__chapterIndex)(ReadingView *);
 
 // While set, isTolino() reports false so the reading-session tracking runs its
 // Kobo path on a Tolino. Scoped to the start/endReadingSession calls only.
@@ -124,6 +126,13 @@ static struct nh_hook NickelReadingStatsHook[] = {
         .lib     = "libnickel.so.1.0.0",
         .out     = nh_symoutptr(ReadingView__updateWordCounts),
         .desc    = "Compute word counts for plain epubs (chapter bars / time estimates)",
+    },
+    {
+        .sym     = "_ZN11ReadingView22mergedTOCAndSpineIndexEv",
+        .sym_new = "_nh_ReadingView__mergedTOCAndSpineIndex",
+        .lib     = "libnickel.so.1.0.0",
+        .out     = nh_symoutptr(ReadingView__mergedTOCAndSpineIndex),
+        .desc    = "Fall back to the spine index for plain epubs so read chapters are highlighted",
     },
     {
         .sym     = "_ZN15FeatureSettings24bookSpecificStatsEnabledEv",
@@ -193,6 +202,11 @@ static struct nh_dlsym NickelReadingStatsDlsym[] = {
         .name = "_ZN11ReadingView13gotWordCountsERK5QListIiE",
         .out  = nh_symoutptr(ReadingView__gotWordCounts),
         .desc = "Deliver the computed word counts to the reading view",
+    },
+    {
+        .name = "_ZN11ReadingView12chapterIndexEv",
+        .out  = nh_symoutptr(ReadingView__chapterIndex),
+        .desc = "Raw spine chapter index (fallback for the merged TOC/spine index on epubs)",
     },
     {0},
 };
@@ -324,6 +338,29 @@ _nh_ReadingView__hasValidReadingStats(ReadingView *view) {
         return true;
     }
     return reading_stats_supported(view);
+}
+
+// mergedTOCAndSpineIndex() is what ReadingView::readingStats() passes into the
+// ReadingStats constructor as the "current chapter" for the chapter-bar
+// coloring (setChapterSizes: chapters before the index are drawn dark/read,
+// chapters after are light/unread). On a plain epub the merged TOC/spine index
+// is never computed — its cached value stays -1 — so the caller clamps it to 0
+// and every chapter after the first is drawn as "unread". Fall back to the raw
+// spine chapterIndex() for plain epubs so the already-read chapters are
+// highlighted correctly.
+extern "C" __attribute__((visibility("default"))) int
+_nh_ReadingView__mergedTOCAndSpineIndex(ReadingView *view) {
+    if (!ReadingView__mergedTOCAndSpineIndex) {
+        return 0;
+    }
+    if (ReadingView__chapterIndex && Content__getMimeType) {
+        const Content *content = reinterpret_cast<const Content *>(
+            reinterpret_cast<const char *>(view) + 0x94);
+        if (Content__getMimeType(content) == QByteArray("application/epub+zip")) {
+            return ReadingView__chapterIndex(view);
+        }
+    }
+    return ReadingView__mergedTOCAndSpineIndex(view);
 }
 
 // ReadingView::updateWordCounts() is the kepub-only gate that computes the
