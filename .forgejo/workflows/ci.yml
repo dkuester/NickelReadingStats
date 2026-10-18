@@ -4,14 +4,16 @@ on: [push]
 
 jobs:
   wordcount:
-    # Host unit tests for the word-counting logic (Qt5Core only, no cross
-    # toolchain). Exercises the same wordcount_logic.h that the hook compiles
-    # against Qt6.
+    # Host unit tests for the word-counting code (Qt5, no cross toolchain).
+    # test_wordcount exercises wordcount_logic.h (the same pure logic the hook
+    # compiles against Qt6); test_epub_words runs the real count_epub_words()
+    # (incl. QZipReader) against a fixture EPUB, so it also needs QtGui's
+    # private headers (qtbase5-private-dev).
     runs-on: codeberg-tiny
     steps:
       - uses: actions/checkout@v4
-      - name: Install Qt5 core
-        run: apt-get update && apt-get install -y --no-install-recommends qtbase5-dev
+      - name: Install Qt5 (incl. private headers)
+        run: apt-get update && apt-get install -y --no-install-recommends qtbase5-dev qtbase5-private-dev
       - name: Build and run word-count unit tests
         run: make -C hook/tests check
 

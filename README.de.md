@@ -110,11 +110,18 @@ Voraussetzung: Docker-Image `strayrose/nickeltc:latest`
 
 Drei Ebenen, von günstig zu gründlich:
 
-1. **Host-Unit-Tests** (`hook/tests/`) — prüfen die Wortzählungs-Logik
-   (Tokenisierung, Script-/Style-Entfernung, Entity-Decoding,
-   Manifest-href-Auflösung, OPF-Spine-Parsing) gegen das Host-Qt. Ohne
-   QZipReader und ohne Cross-Toolchain, läuft also auf jedem Rechner mit
-   Qt-Dev-Installation:
+1. **Host-Unit-Tests** (`hook/tests/`) — zwei Binaries, beide gegen das
+   Host-Qt:
+
+   - `test_wordcount` prüft die pure Logik (Tokenisierung, Script-/Style-
+     Entfernung, Entity-Decoding, Manifest-href-Auflösung, OPF-Spine-Parsing)
+     über `wordcount_logic.h`. Nur QtCore, keine privaten Header.
+   - `test_epub_words` führt das echte `count_epub_words()` — inklusive
+     QZipReader — gegen ein Fixture-EPUB (`fixtures/sample.epub`) aus und
+     prüft die exakten Wortzahlen pro Kapitel. Braucht QtGuis privaten
+     `qzipreader_p.h` und baut nur, wo diese privaten Header installiert sind.
+
+   Beide laufen mit:
 
        make -C hook/tests check
 
