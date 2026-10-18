@@ -66,7 +66,7 @@ static bool (*EventEngine__endReadingSession)(void *, void *, void *, void *);
 static bool (*ReadingView__isFixedLayout)(ReadingView *);
 static int  (*Device__getDeviceClass)(Device *);
 static bool (*Device__isParentalControlEnabled)(Device *);
-static QByteArray (*Content__getMimeType)(const Content *);
+static QByteArray &(*Content__getMimeType)(const Content *);
 static QString    (*Content__getId)(const Content *, const QString &);
 static void       (*ReadingView__gotWordCounts)(ReadingView *, const QList<int> &);
 
