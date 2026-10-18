@@ -31,6 +31,7 @@ Das Mod hookt:
 | `Device::isTolino()` | `_ZNK6Device8isTolinoEv` | meldet nur während der Session-Erfassung „kein Tolino" (siehe unten) |
 | `EventEngine::startReadingSession()` | `_ZN11EventEngine19startReadingSessionE…` | Kobo-Session-Start auf Tolino ausführen |
 | `EventEngine::endReadingSession()` | `_ZN11EventEngine17endReadingSessionE…` | Kobo-Session-Ende auf Tolino ausführen |
+| `EventEngine::fireEvent()` | `_ZN11EventEngine9fireEventEPKcRK6Vol…` | Seitenumbruch-Einstieg auf Tolino ausführen |
 | `EventEngine::fireEventSlot()` | `_ZN11EventEngine13fireEventSlotE10QByt…` | Seitenumbrüche/Events auf Tolino erfassen (Seiten pro Minute) |
 | `ReadingView::supportsReadingStats()` | `_ZNK11ReadingView20supportsReadingStatsEv` | Statistik für normale EPUBs zulassen |
 | `ReadingView::hasValidReadingStats()` | `_ZN11ReadingView20hasValidReadingStatsEv` | Tolino-only TOC/Spine-Prüfung entschärfen |

@@ -61,6 +61,7 @@ static bool (*Device__isTolino)(Device *);
 static bool (*FeatureSettings__bookSpecificStatsEnabled)(FeatureSettings *);
 static bool (*EventEngine__startReadingSession)(void *, void *, void *, void *);
 static bool (*EventEngine__endReadingSession)(void *, void *, void *, void *);
+static void (*EventEngine__fireEvent)(void *, void *, void *, void *);
 static void (*EventEngine__fireEventSlot)(void *, void *, void *, void *);
 
 // Resolved via dlsym.
@@ -144,6 +145,13 @@ static struct nh_hook NickelReadingStatsHook[] = {
         .lib     = "libnickel.so.1.0.0",
         .out     = nh_symoutptr(EventEngine__endReadingSession),
         .desc    = "Run the Kobo session-end path on Tolino devices",
+    },
+    {
+        .sym     = "_ZN11EventEngine9fireEventEPKcRK6VolumeRK4QMapI7QString8QVariantE",
+        .sym_new = "_nh_EventEngine__fireEvent",
+        .lib     = "libnickel.so.1.0.0",
+        .out     = nh_symoutptr(EventEngine__fireEvent),
+        .desc    = "Run the Kobo page-turn event entry on Tolino devices",
     },
     {
         .sym     = "_ZN11EventEngine13fireEventSlotE10QByteArray6Volume4QMapI7QString8QVariantE",
@@ -243,6 +251,22 @@ _nh_EventEngine__endReadingSession(void *engine, void *volume, void *state, void
     bool ret = EventEngine__endReadingSession(engine, volume, state, map);
     g_force_kobo_session = prev;
     return ret;
+}
+
+// fireEvent(char const*, Volume const&, QMap const&) is the page-turn ENTRY:
+// ReadingView::onPageTurned() calls it, and it checks isTolino() before
+// scheduling fireEventSlot() via a single-shot timer. On a Tolino it returns
+// early, so the event never reaches the slot — this gate must be un-gated
+// first. Run it with isTolino() forced to false.
+extern "C" __attribute__((visibility("default"))) void
+_nh_EventEngine__fireEvent(void *engine, void *name, void *volume, void *map) {
+    if (!EventEngine__fireEvent) {
+        return;
+    }
+    bool prev = g_force_kobo_session;
+    g_force_kobo_session = true;
+    EventEngine__fireEvent(engine, name, volume, map);
+    g_force_kobo_session = prev;
 }
 
 // fireEventSlot() is the Qt slot that dispatches every reading-life event
