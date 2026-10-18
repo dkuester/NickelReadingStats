@@ -1,154 +1,156 @@
 # NickelReadingStats
 
-NickelHook-Mod für Tolino-Firmware 5.18+ (Qt 6.5.2), der die
-Kobo-„Reading Stats" (Lesestatistik) wiederherstellt und für normale
-(sideloaded) EPUBs freischaltet.
+> Deutsch: [README.de.md](README.de.md)
 
-## Was das Mod tut
+A NickelHook mod for Tolino firmware 5.18+ (Qt 6.5.2) that restores the Kobo
+"Reading Stats" and enables them for regular (sideloaded) EPUBs.
 
-Auf einem Tolino ist die Lesestatistik durch zwei unabhängige Gatter in
-`libnickel.so.1.0.0` deaktiviert:
+## What it does
 
-1. `Device::supportsReadingLife()` liefert `!Device::isTolino()` zurück.
-   Auf einem Tolino also immer `false` — die komplette Reading-Life-/
-   Statistik-UI („Reading stats"-Seite, Statistik-Tab im Lesemenü) wird nie
-   angeboten. Das ist der Unterschied „Kobo-Modus vs. Tolino-Modus".
+On a Tolino, reading stats are disabled by two independent gates in
+`libnickel.so.1.0.0`:
 
-2. `ReadingView::supportsReadingStats()` verlangt den MIME-Typ
+1. `Device::supportsReadingLife()` returns `!Device::isTolino()`.
+   On a Tolino that is always `false`, so the entire Reading Life / stats UI
+   (the "Reading stats" page and the stats tab in the reading menu) is never
+   offered. This is the "Kobo mode vs. Tolino mode" difference.
+
+2. `ReadingView::supportsReadingStats()` requires the book's MIME type to be
    `application/x-kobo-epub+zip` (kepub). Sideloaded EPUBs
-   (`application/epub+zip`) bekommen daher auch auf einem echten Kobo keine
-   Statistik. `hasValidReadingStats()` prüft zusätzlich den Tolino-Flag und
-   einen merged-TOC/Spine-Index, den normale EPUBs nicht besitzen.
+   (`application/epub+zip`) therefore get no stats even on a real Kobo.
+   `hasValidReadingStats()` additionally re-checks the Tolino flag and a
+   merged TOC/spine index that regular EPUBs do not have.
 
-Das Mod hookt:
+The mod hooks:
 
-| Hook | Symbol | Wirkung |
+| Hook | Symbol | Effect |
 |---|---|---|
-| `Device::supportsReadingLife()` | `_ZNK6Device19supportsReadingLifeEv` | Feature auf Tolino wieder aktivieren |
-| `Device::supportsActivityInMore()` | `_ZNK6Device22supportsActivityInMoreEv` | „Aktivität"-Eintrag im Mehr-Menü auf Tolino anzeigen |
-| `Device::isTolino()` | `_ZNK6Device8isTolinoEv` | meldet nur während der Session-Erfassung „kein Tolino" (siehe unten) |
-| `EventEngine::startReadingSession()` | `_ZN11EventEngine19startReadingSessionE…` | Kobo-Session-Start auf Tolino ausführen |
-| `EventEngine::endReadingSession()` | `_ZN11EventEngine17endReadingSessionE…` | Kobo-Session-Ende auf Tolino ausführen |
-| `EventEngine::fireEventSlot()` | `_ZN11EventEngine13fireEventSlotE10QByt…` | Seitenumbrüche/Events auf Tolino erfassen (Seiten pro Minute) |
-| `ReadingView::supportsReadingStats()` | `_ZNK11ReadingView20supportsReadingStatsEv` | Statistik für normale EPUBs zulassen |
-| `ReadingView::hasValidReadingStats()` | `_ZN11ReadingView20hasValidReadingStatsEv` | Tolino-only TOC/Spine-Prüfung entschärfen |
-| `ReadingView::updateWordCounts()` | `_ZN11ReadingView16updateWordCountsEv` | Wortzählung für normale EPUBs nachrüsten (siehe unten) |
-| `FeatureSettings::bookSpecificStatsEnabled()` | `_ZN15FeatureSettings24bookSpecificStatsEnabledEv` | Per-Book-Statistik forcieren |
+| `Device::supportsReadingLife()` | `_ZNK6Device19supportsReadingLifeEv` | Re-enable the feature on Tolino |
+| `Device::supportsActivityInMore()` | `_ZNK6Device22supportsActivityInMoreEv` | Show the "Activity" entry in the More menu on Tolino |
+| `Device::isTolino()` | `_ZNK6Device8isTolinoEv` | Report "not Tolino" only while reading events are tracked (see below) |
+| `EventEngine::startReadingSession()` | `_ZN11EventEngine19startReadingSessionE…` | Run the Kobo session-start path on Tolino |
+| `EventEngine::endReadingSession()` | `_ZN11EventEngine17endReadingSessionE…` | Run the Kobo session-end path on Tolino |
+| `EventEngine::fireEventSlot()` | `_ZN11EventEngine13fireEventSlotE10QByt…` | Record page turns/events on Tolino (pages per minute) |
+| `ReadingView::supportsReadingStats()` | `_ZNK11ReadingView20supportsReadingStatsEv` | Allow stats for regular EPUBs |
+| `ReadingView::hasValidReadingStats()` | `_ZN11ReadingView20hasValidReadingStatsEv` | Drop the Tolino-only TOC/spine validation |
+| `ReadingView::updateWordCounts()` | `_ZN11ReadingView16updateWordCountsEv` | Retrofit word counting for regular EPUBs (see below) |
+| `FeatureSettings::bookSpecificStatsEnabled()` | `_ZN15FeatureSettings24bookSpecificStatsEnabledEv` | Force per-book stats on |
 
-Die drei Kennzahlen „Stunden gelesen", „Minuten pro Sitzung" und „Seiten pro
-Minute" speist die Lesesitzungs-Erfassung (`startReadingSession`/
-`endReadingSession`). Die prüfen intern `isTolino()` und überspringen auf dem
-Tolino die komplette Kobo-Erfassung. Der Hook führt sie mit einem
-`g_force_kobo_session`-Flag aus, das `isTolino()` nur während dieser zwei
-Aufrufe `false` liefern lässt — der Rest des Geräts (Tolino-Shop/-Cloud/-DRM)
-behält sein normales Verhalten.
+The three metrics "hours read", "minutes per session" and "pages per minute"
+are fed by the reading-session tracking (`startReadingSession`/
+`endReadingSession`). Those check `isTolino()` internally and skip the entire
+Kobo recording on a Tolino. The hook runs them with a `g_force_kobo_session`
+flag that makes `isTolino()` return `false` only during those calls — the rest
+of the device (Tolino store/cloud/DRM) keeps its normal behaviour.
 
-Wichtig: Der „Aktivität"-Eintrag hängt an `supportsActivityInMore()`, das auf
-Tolino wegen `isTolino()` sofort `false` liefert — unabhängig von
-`supportsReadingLife()`. Deshalb blieb der Eintrag zunächst versteckt. Der
-Hook führt die ursprüngliche Prüfung (`!isTolino() && deviceClass == 2 &&
-!ParentalControl`) erneut aus, lässt aber nur die `isTolino()`-Sperre weg;
-Geräteklasse und Jugendschutz bleiben erhalten.
+Page turns are recorded separately: they are dispatched through
+`EventEngine::fireEventSlot()`, which also checks `isTolino()` and bails out on
+a Tolino. The hook runs it with the same flag so page turns are counted.
 
-Fixed-Layout-Inhalte (Fixed-Layout-EPUBs, PDF, Comics) bleiben bewusst
-ausgeschlossen — dafür wird `ReadingView::isFixedLayout()` via `dlsym`
-aufgelöst. Die Hooks rufen zuerst die Originalfunktion auf und greifen nur
-ein, wenn Nickel selbst `false` liefert; dadurch bleibt bestehendes
-Verhalten (z. B. kepub auf Kobo) unverändert.
+Important: the "Activity" entry depends on `supportsActivityInMore()`, which
+returns `false` on a Tolino because of `isTolino()` — independently of
+`supportsReadingLife()`. That is why the entry stayed hidden at first. The hook
+re-runs the original check (`!isTolino() && deviceClass == 2 &&
+!ParentalControl`) but drops only the `isTolino()` gate; the device-class and
+parental-control guards remain.
 
-## Wortzählung für normale EPUBs
+Fixed-layout content (fixed-layout EPUBs, PDF, comics) is deliberately
+excluded — `ReadingView::isFixedLayout()` is resolved via `dlsym` for that. The
+hooks call the original function first and only intervene when Nickel itself
+returns `false`, so existing behaviour (e.g. kepub on Kobo) is unchanged.
 
-`ReadingView::updateWordCounts()` ist das kepub-only-Gatter, das die
-Wortzählung pro Kapitel erzeugt — die Grundlage für das Kapitel-Balkendiagramm
-und die „verbleibende Zeit"-Schätzung. Es kehrt für alles, was kein kepub ist,
-sofort um. Der Hook ruft zuerst die Originalfunktion auf (kepub und Instapaper
-laufen unverändert) und zählt danach für ein sideloaded EPUB die Wörter selbst:
+## Word counting for regular EPUBs
 
-1. MIME-Typ prüfen (`application/epub+zip`) und Fixed-Layout ausschließen.
-2. Den Dateipfad des EPUBs aus der Content-ID (`file://…`) ableiten.
-3. Das EPUB-Zip mit `QZipReader` öffnen, die OPF lokalisieren
-   (`META-INF/container.xml`, Fallback `*.opf`) und die Spine-Reihenfolge
-   parsen (Manifest + Spine).
-4. Pro Spine-Datei das XHTML lesen, Tags/Skripte/Styles entfernen und die
-   Wörter zählen.
-5. Die `QList<int>` über `ReadingView::gotWordCounts()` an Nickel liefern.
+`ReadingView::updateWordCounts()` is the kepub-only gate that produces the
+per-chapter word counts behind the chapter bars and the "time left" estimate.
+It returns immediately for anything that is not a kepub. The hook calls the
+original first (kepub and Instapaper run unchanged), then counts the words for
+a sideloaded EPUB itself:
 
-Damit füllt sich auch bei normalen EPUBs das Kapitel-Balkendiagramm und die
-zeitbasierten Schätzungen werden plausibel. Randnotiz: Bücher, die aus einer
-einzigen großen HTML-Datei bestehen, ergeben genau einen Balken — das ist
-korrekt, keine leere Anzeige.
+1. Check the MIME type (`application/epub+zip`) and exclude fixed-layout.
+2. Derive the EPUB file path from the content ID (`file://…`).
+3. Open the EPUB zip with `QZipReader`, locate the OPF
+   (`META-INF/container.xml`, fallback `*.opf`) and parse the spine order
+   (manifest + spine).
+4. For each spine file, read the XHTML, strip tags/scripts/styles and count
+   the words.
+5. Deliver the `QList<int>` to Nickel via `ReadingView::gotWordCounts()`.
 
-## Grenzen („robust" heißt hier: sauber degradieren, nicht abstürzen)
+This fills the chapter bars and makes the time-based estimates plausible for
+regular EPUBs too. Note: a book made of a single large HTML file yields exactly
+one bar — that is correct, not an empty view.
 
-Fixed-Layout-Inhalte (Fixed-Layout-EPUBs, PDF, Comics) bleiben bewusst
-ausgeschlossen — dafür wird `ReadingView::isFixedLayout()` via `dlsym`
-aufgelöst. Die Wortzählung wird nur angestoßen, wenn alle dlsym-Ziele
-vorhanden sind; fehlt etwas, wird sie still übersprungen statt zu crashen.
-Die Hooks rufen zuerst die Originalfunktion auf und greifen nur ein, wenn
-Nickel selbst nichts liefert; dadurch bleibt bestehendes Verhalten
-(z. B. kepub auf Kobo) unverändert.
+## Limits ("robust" here means: degrade gracefully, don't crash)
 
-## Bauen
+Fixed-layout content (fixed-layout EPUBs, PDF, comics) is deliberately
+excluded — `ReadingView::isFixedLayout()` is resolved via `dlsym` for that.
+Word counting only runs when all dlsym targets are present; if one is missing
+it is silently skipped rather than crashing. The hooks call the original
+function first and only intervene when Nickel provides nothing, so existing
+behaviour (e.g. kepub on Kobo) is unchanged.
 
-Voraussetzung: Docker-Image `strayrose/nickeltc:latest`
-(`arm-kobo-linux-gnueabihf`-Toolchain, Qt 6.5.2).
+## Building
+
+Prerequisite: the Docker image `strayrose/nickeltc:latest`
+(`arm-kobo-linux-gnueabihf` toolchain, Qt 6.5.2).
 
     cd hook
     docker run --rm --volume="$PWD:$PWD" --workdir="$PWD" strayrose/nickeltc make
     docker run --rm --volume="$PWD:$PWD" --workdir="$PWD" strayrose/nickeltc make kobo
 
-## Testen (Symbol- & ABI-Check)
+## Testing (symbol & ABI check)
 
-`tools/check-symbols.py` verifiziert lokal zweierlei:
+`tools/check-symbols.py` verifies two things locally:
 
-1. Jedes Hook- (`.sym`) und dlsym-Symbol (`.name`) existiert in der
-   Ziel-Firmware — fängt Tippfehler und Symbole, die es dort nicht gibt.
-2. Die Rückgabe-Konvention jedes dlsym-Symbols (sret/Wert vs. Referenz/
-   Pointer) passt zur im Hook deklarierten Funktion. Genau diese Konvention
-   war der Absturz-Grund beim Buchöffnen: `Content::getMimeType()` gibt
-   `QByteArray&` zurück, nicht `QByteArray` per Wert.
+1. Every hook (`.sym`) and dlsym symbol (`.name`) exists in the target
+   firmware — catches typos and symbols that are not there.
+2. The return convention of every dlsym symbol (sret/value vs.
+   reference/pointer) matches the function declared in the hook. This exact
+   convention was the reason for the book-open crash: `Content::getMimeType()`
+   returns `QByteArray&`, not `QByteArray` by value.
 
     python3 tools/check-symbols.py \
         --source hook/src/readingstats.cc \
         --defsyms <defsyms.txt> \
         --firmware <libnickel.so.1.0.0>
 
-`defsyms.txt` und `libnickel.so.1.0.0` stammen aus der Tolino-Firmware
-(proprietär) und liegen bewusst nicht im Repo — den lokalen Pfad angeben.
+`defsyms.txt` and `libnickel.so.1.0.0` come from the Tolino firmware
+(proprietary) and are deliberately not in the repo — pass the local path.
 
-CI (`.forgejo/workflows/ci.yml`) führt bei jedem Push einen leichten
-Manifest-Check aus: `tools/check-manifest.py` verifiziert, dass die
-`.sym`/`.name`-Symbole im Quelltext exakt mit `tools/symbols.txt`
-(firmware-verifiziert) übereinstimmen. Der ARM/Qt6-Cross-Compile-Build bleibt
-lokal (das Toolchain-Image ist ~3,4 GB, zu schwer für Codebergs Runner).
+CI (`.forgejo/workflows/ci.yml`) runs a lightweight manifest check on every
+push: `tools/check-manifest.py` verifies that the `.sym`/`.name` symbols in the
+source match `tools/symbols.txt` (firmware-verified) exactly. The ARM/Qt6
+cross-compile build stays local (the toolchain image is ~3.4 GB, too heavy for
+Codeberg's runners).
 
-## Installieren
+## Installing
 
-`hook/Kobo.tgz` nach `.kobo/` auf dem Gerät legen und Nickel neu starten.
-Deinstallieren: leere Datei `readingstats_uninstall` im Geräteroot ablegen
-und Nickel neu starten.
+Put `hook/Kobo.tgz` into `.kobo/` on the device and restart Nickel.
+To uninstall: create an empty file `readingstats_uninstall` in the device root
+and restart Nickel.
 
-## Quellen & Danksagung
+## Sources & acknowledgements
 
-Der Mod steht auf den Schultern folgender Projekte:
+This mod stands on the shoulders of the following projects:
 
-- **NickelHook** (MIT, Copyright (c) 2020–2025 Patrick Gaskin) — das
-  Hook-Framework, auf dem der Mod aufbaut. Verwendet als Git-Submodul in der
-  `qt6-support`-Fork von **Nico Verbruggen** (`nicoverbruggen/NickelHook`), die
-  Qt-6-Unterstützung ergänzt.
+- **NickelHook** (MIT, Copyright (c) 2020–2025 Patrick Gaskin) — the hook
+  framework this mod is built on. Used as a git submodule in the
+  `qt6-support` fork by **Nico Verbruggen** (`nicoverbruggen/NickelHook`),
+  which adds Qt 6 support.
 - **Qt 6.5.2** (The Qt Project / The Qt Company) — `QZipReader` (private API,
-  LGPL-3.0/GPL-2.0/GPL-3.0) zum Lesen der EPUB-Zip-Archive sowie
-  `QXmlStreamReader` und `QRegularExpression` fürs Parsen und Zählen.
-- **strayrose/nickeltc** — Docker-Cross-Compile-Toolchain
-  (`arm-kobo-linux-gnueabihf`, GCC 11.5, Qt 6.5.2), mit der das Hook gebaut wird.
-- **Kobo/Tolino-Firmware** (`libnickel.so.1.0.0`, Tolino 5.18) — das Ziel-Binary.
-  Die internen Klassen (`Device`, `ReadingView`, `Content`, `EventEngine`) wurden
-  per Symbolanalyse und Capstone-Disassembly reverse-engineered.
+  LGPL-3.0/GPL-2.0/GPL-3.0) for reading the EPUB zip archives, plus
+  `QXmlStreamReader` and `QRegularExpression` for parsing and counting.
+- **strayrose/nickeltc** — Docker cross-compile toolchain
+  (`arm-kobo-linux-gnueabihf`, GCC 11.5, Qt 6.5.2) used to build the hook.
+- **Kobo/Tolino firmware** (`libnickel.so.1.0.0`, Tolino 5.18) — the target
+  binary. The internal classes (`Device`, `ReadingView`, `Content`,
+  `EventEngine`) were reverse-engineered via symbol analysis and Capstone
+  disassembly.
 
-## KI-Unterstützung
+## AI assistance
 
-Dieses Mod wurde mit Hilfe einer KI reverse-engineered und gebaut: die Analyse
-der Firmware-Gatter, das Disassemblieren der Zielklassen und die
-Implementierung der Hooks entstanden im Dialog mit einem KI-Assistenten
-(Hermes Agent, Nous Research). Fachliche Kontrolle, On-Device-Tests und
-Freigabe lagen bei einem Menschen.
+This mod was reverse-engineered and built with the help of an AI: the analysis
+of the firmware gates, the disassembly of the target classes and the
+implementation of the hooks were done in dialogue with an AI assistant (Hermes
+Agent, Nous Research). Technical review, on-device testing and sign-off were
+done by a human.
