@@ -98,30 +98,38 @@ Prerequisite: the Docker image `strayrose/nickeltc:latest`
     docker run --rm --volume="$PWD:$PWD" --workdir="$PWD" strayrose/nickeltc make
     docker run --rm --volume="$PWD:$PWD" --workdir="$PWD" strayrose/nickeltc make kobo
 
-## Testing (symbol & ABI check)
+## Testing
 
-`tools/check-symbols.py` verifies two things locally:
+Three levels, from cheap to thorough:
 
-1. Every hook (`.sym`) and dlsym symbol (`.name`) exists in the target
-   firmware — catches typos and symbols that are not there.
-2. The return convention of every dlsym symbol (sret/value vs.
-   reference/pointer) matches the function declared in the hook. This exact
-   convention was the reason for the book-open crash: `Content::getMimeType()`
-   returns `QByteArray&`, not `QByteArray` by value.
+1. **Host unit tests** (`hook/tests/`) — exercise the word-counting logic
+   (tokenising, script/style stripping, entity decoding, manifest-href
+   resolution, OPF spine parsing) against the host Qt. No QZipReader and no
+   cross toolchain, so it runs on any machine with a Qt dev install:
 
-    python3 tools/check-symbols.py \
-        --source hook/src/readingstats.cc \
-        --defsyms <defsyms.txt> \
-        --firmware <libnickel.so.1.0.0>
+       make -C hook/tests check
 
-`defsyms.txt` and `libnickel.so.1.0.0` come from the Tolino firmware
-(proprietary) and are deliberately not in the repo — pass the local path.
+2. **Local symbol & ABI check** (`tools/check-symbols.py`) — verifies every
+   hook (`.sym`) and dlsym (`.name`) symbol exists in the target firmware, and
+   that each dlsym return convention (sret/value vs. reference/pointer) matches
+   the function declared in the hook. This exact convention was the reason for
+   the book-open crash: `Content::getMimeType()` returns `QByteArray&`, not
+   `QByteArray` by value. Needs the proprietary firmware files:
 
-CI (`.forgejo/workflows/ci.yml`) runs a lightweight manifest check on every
-push: `tools/check-manifest.py` verifies that the `.sym`/`.name` symbols in the
-source match `tools/symbols.txt` (firmware-verified) exactly. The ARM/Qt6
-cross-compile build stays local (the toolchain image is ~3.4 GB, too heavy for
-Codeberg's runners).
+       python3 tools/check-symbols.py \
+           --source hook/src/readingstats.cc \
+           --defsyms <defsyms.txt> \
+           --firmware <libnickel.so.1.0.0>
+
+   `defsyms.txt` and `libnickel.so.1.0.0` come from the Tolino firmware
+   (proprietary) and are deliberately not in the repo — pass the local path.
+
+3. **CI** (`.forgejo/workflows/ci.yml`) — on every push it installs Qt5 and
+   runs the host unit tests, plus the firmware-independent manifest check
+   (`tools/check-manifest.py`), which verifies the `.sym`/`.name` symbols in
+   the source match `tools/symbols.txt` (firmware-verified) exactly. The
+   ARM/Qt6 cross-compile build stays local (the toolchain image is ~3.4 GB, too
+   heavy for Codeberg's runners).
 
 ## Installing
 

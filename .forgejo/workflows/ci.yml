@@ -3,6 +3,18 @@ name: CI
 on: [push]
 
 jobs:
+  wordcount:
+    # Host unit tests for the word-counting logic (Qt5Core only, no cross
+    # toolchain). Exercises the same wordcount_logic.h that the hook compiles
+    # against Qt6.
+    runs-on: codeberg-tiny
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Qt5 core
+        run: apt-get update && apt-get install -y --no-install-recommends qtbase5-dev
+      - name: Build and run word-count unit tests
+        run: make -C hook/tests check
+
   symbols:
     # Pure Python, no Docker: catches symbol typos and unverified symbol
     # additions (drift from the firmware-verified manifest tools/symbols.txt).

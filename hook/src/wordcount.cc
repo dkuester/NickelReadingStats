@@ -8,82 +8,11 @@
  */
 
 #include "wordcount.h"
+#include "wordcount_logic.h"
 
 #include <QByteArray>
-#include <QHash>
-#include <QRegularExpression>
 #include <QXmlStreamReader>
 #include <QtGui/private/qzipreader_p.h>
-
-// Count whitespace-separated non-empty tokens in an XHTML string.
-static int count_words(const QString &html)
-{
-    QString text = html;
-
-    // Drop <script>/<style> blocks including their contents (case-insensitive,
-    // non-greedy). These are not prose.
-    static const QRegularExpression block(
-        "<(script|style)[^>]*>.*?</\\1>",
-        QRegularExpression::CaseInsensitiveOption |
-            QRegularExpression::DotMatchesEverythingOption);
-    text.remove(block);
-
-    // Drop every remaining tag.
-    static const QRegularExpression tag("<[^>]*>");
-    text.remove(tag);
-
-    // Decode the entities that commonly separate real words.
-    text.replace(QLatin1String("&nbsp;"), QLatin1String(" "));
-    text.replace(QLatin1String("&#160;"), QLatin1String(" "));
-    text.replace(QLatin1String("&amp;"), QLatin1String("&"));
-    text.replace(QLatin1String("&lt;"), QLatin1String("<"));
-    text.replace(QLatin1String("&gt;"), QLatin1String(">"));
-    text.replace(QLatin1String("&quot;"), QLatin1String("\""));
-    text.replace(QLatin1String("&#39;"), QLatin1String("'"));
-    text.replace(QLatin1String("&rsquo;"), QLatin1String("'"));
-    text.replace(QLatin1String("&ldquo;"), QLatin1String("\""));
-    text.replace(QLatin1String("&rdquo;"), QLatin1String("\""));
-
-    int count = 0;
-    bool in_word = false;
-    for (const QChar &c : text) {
-        if (c.isSpace()) {
-            in_word = false;
-        } else if (!in_word) {
-            in_word = true;
-            ++count;
-        }
-    }
-    return count;
-}
-
-// Resolve a manifest href (relative to the OPF directory) to a zip path.
-static QString join_path(const QString &opf_dir, const QString &href)
-{
-    if (href.startsWith(QLatin1Char('/'))) {
-        return href.mid(1);
-    }
-    if (opf_dir.isEmpty()) {
-        return href;
-    }
-    QString joined = opf_dir + QLatin1Char('/') + href;
-    // Collapse a/./b and a/../b without touching the leading component.
-    QStringList parts = joined.split(QLatin1Char('/'), Qt::SkipEmptyParts);
-    QStringList out;
-    for (const QString &p : parts) {
-        if (p == QLatin1String(".")) {
-            continue;
-        }
-        if (p == QLatin1String("..")) {
-            if (!out.isEmpty()) {
-                out.removeLast();
-            }
-            continue;
-        }
-        out.append(p);
-    }
-    return out.join(QLatin1Char('/'));
-}
 
 // Locate the OPF path: META-INF/container.xml first, then *.opf fallback.
 static QString find_opf(QZipReader &zip)
@@ -108,36 +37,6 @@ static QString find_opf(QZipReader &zip)
         }
     }
     return QString();
-}
-
-// Parse the OPF and return spine hrefs in reading order.
-static QStringList parse_spine(const QByteArray &opf)
-{
-    QHash<QString, QString> manifest; // id -> href
-    QStringList idrefs;               // spine order
-    QXmlStreamReader xml(opf);
-    while (!xml.atEnd()) {
-        xml.readNext();
-        if (!xml.isStartElement()) {
-            continue;
-        }
-        if (xml.name() == QLatin1String("item")) {
-            const QString id = xml.attributes().value(QLatin1String("id")).toString();
-            const QString href = xml.attributes().value(QLatin1String("href")).toString();
-            manifest.insert(id, href);
-        } else if (xml.name() == QLatin1String("itemref")) {
-            idrefs.append(xml.attributes().value(QLatin1String("idref")).toString());
-        }
-    }
-
-    QStringList spine;
-    for (const QString &idref : idrefs) {
-        const auto it = manifest.constFind(idref);
-        if (it != manifest.constEnd()) {
-            spine.append(*it);
-        }
-    }
-    return spine;
 }
 
 QList<int> count_epub_words(const QString &epub_path)
