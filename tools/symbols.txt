@@ -1,0 +1,19 @@
+# Verified hook/dlsym symbols this mod depends on.
+# Each name was confirmed to exist in the Tolino 5.18 firmware (libnickel.so.1.0.0)
+# via tools/check-symbols.py. Do NOT add a name here without running that check
+# first — CI fails if the source's symbols drift from this list.
+_ZN11EventEngine17endReadingSessionER6VolumeRK11PluginState4QMapI7QString8QVariantE
+_ZN11EventEngine19startReadingSessionER6VolumeRK11PluginState4QMapI7QString8QVariantE
+_ZN11ReadingView13gotWordCountsERK5QListIiE
+_ZN11ReadingView16updateWordCountsEv
+_ZN11ReadingView20hasValidReadingStatsEv
+_ZN15FeatureSettings24bookSpecificStatsEnabledEv
+_ZNK11ReadingView13isFixedLayoutEv
+_ZNK11ReadingView20supportsReadingStatsEv
+_ZNK6Device14getDeviceClassEv
+_ZNK6Device19supportsReadingLifeEv
+_ZNK6Device22supportsActivityInMoreEv
+_ZNK6Device24isParentalControlEnabledEv
+_ZNK6Device8isTolinoEv
+_ZNK7Content11getMimeTypeEv
+_ZNK7Content5getIdERK7QString

@@ -1,0 +1,20 @@
+name: CI
+
+on: [push]
+
+jobs:
+  symbols:
+    # Pure Python, no Docker: catches symbol typos and unverified symbol
+    # additions (drift from the firmware-verified manifest tools/symbols.txt).
+    runs-on: codeberg-tiny
+    steps:
+      - uses: actions/checkout@v4
+      - name: Symbol manifest check
+        run: python3 tools/check-manifest.py --source hook/src/readingstats.cc --manifest tools/symbols.txt
+      - name: Tools syntax check
+        run: python3 -m py_compile tools/check-symbols.py tools/check-manifest.py
+
+  # No cross-compile build job here: the ARM/Qt6 toolchain image
+  # (strayrose/nickeltc) is ~3.4 GB, too heavy for Codeberg's hosted runners.
+  # Build locally instead:
+  #   cd hook && docker run --rm -v "$PWD:$PWD" -w "$PWD" strayrose/nickeltc make kobo
