@@ -115,6 +115,12 @@ Voraussetzung: Docker-Image `strayrose/nickeltc:latest`
 `defsyms.txt` und `libnickel.so.1.0.0` stammen aus der Tolino-Firmware
 (proprietär) und liegen bewusst nicht im Repo — den lokalen Pfad angeben.
 
+CI (`.forgejo/workflows/ci.yml`) führt bei jedem Push einen leichten
+Manifest-Check aus: `tools/check-manifest.py` verifiziert, dass die
+`.sym`/`.name`-Symbole im Quelltext exakt mit `tools/symbols.txt`
+(firmware-verifiziert) übereinstimmen. Der ARM/Qt6-Cross-Compile-Build bleibt
+lokal (das Toolchain-Image ist ~3,4 GB, zu schwer für Codebergs Runner).
+
 ## Installieren
 
 `hook/Kobo.tgz` nach `.kobo/` auf dem Gerät legen und Nickel neu starten.
