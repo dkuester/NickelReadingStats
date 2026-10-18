@@ -96,6 +96,25 @@ Voraussetzung: Docker-Image `strayrose/nickeltc:latest`
     docker run --rm --volume="$PWD:$PWD" --workdir="$PWD" strayrose/nickeltc make
     docker run --rm --volume="$PWD:$PWD" --workdir="$PWD" strayrose/nickeltc make kobo
 
+## Testen (Symbol- & ABI-Check)
+
+`tools/check-symbols.py` verifiziert lokal zweierlei:
+
+1. Jedes Hook- (`.sym`) und dlsym-Symbol (`.name`) existiert in der
+   Ziel-Firmware — fängt Tippfehler und Symbole, die es dort nicht gibt.
+2. Die Rückgabe-Konvention jedes dlsym-Symbols (sret/Wert vs. Referenz/
+   Pointer) passt zur im Hook deklarierten Funktion. Genau diese Konvention
+   war der Absturz-Grund beim Buchöffnen: `Content::getMimeType()` gibt
+   `QByteArray&` zurück, nicht `QByteArray` per Wert.
+
+    python3 tools/check-symbols.py \
+        --source hook/src/readingstats.cc \
+        --defsyms <defsyms.txt> \
+        --firmware <libnickel.so.1.0.0>
+
+`defsyms.txt` und `libnickel.so.1.0.0` stammen aus der Tolino-Firmware
+(proprietär) und liegen bewusst nicht im Repo — den lokalen Pfad angeben.
+
 ## Installieren
 
 `hook/Kobo.tgz` nach `.kobo/` auf dem Gerät legen und Nickel neu starten.
