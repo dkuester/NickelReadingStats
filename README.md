@@ -124,7 +124,10 @@ Three levels, from cheap to thorough:
    that each dlsym return convention (sret/value vs. reference/pointer) matches
    the function declared in the hook. This exact convention was the reason for
    the book-open crash: `Content::getMimeType()` returns `QByteArray&`, not
-   `QByteArray` by value. Needs the proprietary firmware files:
+   `QByteArray` by value. It also checks the hard-coded `ReadingView` →
+   `Content` offset (`kReadingViewContentOffset`, 0x94 on 5.18) against the
+   instruction in `ReadingView::updateWordCounts()` that computes it. Needs the
+   proprietary firmware files:
 
        python3 tools/check-symbols.py \
            --source hook/src/readingstats.cc \

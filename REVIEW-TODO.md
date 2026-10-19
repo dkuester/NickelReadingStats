@@ -15,7 +15,7 @@ Status: `[ ]` offen · `[~]` in Arbeit · `[x]` erledigt · `[!]` blockiert (Gru
 
 ## Hohe Priorität
 
-- [ ] **H1** Hartkodierter Offset `ReadingView + 0x94` (2×): benannte Konstante
+- [x] **H1** Hartkodierter Offset `ReadingView + 0x94` (2×): benannte Konstante
   plus Helper. `check-symbols.py` soll den Offset per Disassembly von
   `updateWordCounts` mitprüfen (braucht die Firmware lokal).
 - [ ] **H2** `g_force_kobo_session`: `thread_local` und RAII-Guard statt
@@ -113,3 +113,4 @@ Aufgaben:
 - 2026-10-19: R1, K4 erledigt; check-symbols.py lokal grün gegen 5.18.
 - 2026-10-19: M4 erledigt (Activity-Eintrag fail-closed).
 - 2026-10-19: H3 erledigt (ein Eintrag pro Spine-Item, Prozent-Dekodierung).
+- 2026-10-19: H1 erledigt (Konstante + Helper, Offset-Check in check-symbols.py, gegen 5.18 grün).

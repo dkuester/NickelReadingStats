@@ -130,8 +130,11 @@ Drei Ebenen, von günstig zu gründlich:
    existiert und jede dlsym-Rückgabe-Konvention (sret/Wert vs. Referenz/
    Pointer) zur deklarierten Funktion passt. Genau diese Konvention war der
    Absturz-Grund beim Buchöffnen: `Content::getMimeType()` gibt `QByteArray&`
-   zurück, nicht `QByteArray` per Wert. Braucht die proprietären
-   Firmware-Dateien:
+   zurück, nicht `QByteArray` per Wert. Außerdem prüft er den fest
+   eingetragenen Offset `ReadingView` → `Content`
+   (`kReadingViewContentOffset`, 0x94 auf 5.18) gegen die Instruktion in
+   `ReadingView::updateWordCounts()`, die ihn berechnet. Braucht die
+   proprietären Firmware-Dateien:
 
        python3 tools/check-symbols.py \
            --source hook/src/readingstats.cc \

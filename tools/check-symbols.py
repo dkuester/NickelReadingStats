@@ -5,13 +5,15 @@ Local dev tool — needs the target firmware (libnickel.so.1.0.0) and its
 exported-symbol list (defsyms.txt), both extracted from a Tolino 5.18 image.
 Neither file is committed (proprietary); keep them in a local scratch dir.
 
-Two checks:
+Three checks:
 1. Every `.sym` (hook) and `.name` (dlsym) mangled name in the source must
    exist in defsyms.txt. Catches typos and symbols that aren't in the firmware.
 2. Every dlsym symbol is disassembled and its return convention is classified
    (sret-by-value vs. pointer/reference-return). A dlsym'd fn-ptr declared
    with the WRONG convention crashes nickel at runtime (the getMimeType bug:
    declared `QByteArray` by value, but the symbol returns `QByteArray&`).
+3. Every hard-coded struct offset in the source (OFFSETS) matches the
+   instruction that computes it in the firmware.
 
 Usage:
     python3 tools/check-symbols.py \
@@ -127,6 +129,50 @@ def classify(data, addr, next_addr):
     return "unknown"
 
 
+# Struct offsets the hook hard-codes, verified against the instruction that
+# computes them inside a firmware function:
+#   source constant -> (function symbol, regex on the op_str of its add)
+OFFSETS = {
+    "kReadingViewContentOffset": (
+        "_ZN11ReadingView16updateWordCountsEv",
+        r"r\d+, r0, #(0x[0-9a-f]+)$",
+    ),
+}
+
+
+def check_offsets(source_text, defsyms, data, addrs):
+    """Return the number of offset problems (printing one line per offset)."""
+    md = Cs(CS_ARCH_ARM, CS_MODE_THUMB)
+    errors = 0
+    for const, (sym, pattern) in sorted(OFFSETS.items()):
+        m = re.search(r"\b%s\s*=\s*(0x[0-9a-fA-F]+|\d+)" % const, source_text)
+        if not m:
+            print("  MISS     %-28s not found in source" % const)
+            errors += 1
+            continue
+        want = int(m.group(1), 0)
+        if sym not in defsyms:
+            print("  MISS     %-28s %s not in firmware" % (const, sym))
+            errors += 1
+            continue
+        addr = defsyms[sym]
+        next_addr = next((a for a in addrs if a > addr), addr + 0x120)
+        got = None
+        # The offset is taken from `this` near the top of the function.
+        for ins in list(md.disasm(data[addr:next_addr], addr))[:24]:
+            hit = re.match(pattern, ins.op_str)
+            if ins.mnemonic in ("add", "add.w", "adds") and hit:
+                got = int(hit.group(1), 16)
+                break
+        if got == want:
+            print("  OK       %-28s 0x%x (%s)" % (const, want, sym))
+        else:
+            print("  MISMATCH %-28s source=0x%x firmware=%s (%s)" % (
+                const, want, "?" if got is None else "0x%x" % got, sym))
+            errors += 1
+    return errors
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--source", required=True)
@@ -174,6 +220,10 @@ def main():
         print("  %-8s %-60s got=%-8s want=%s" % (status, name, got, want or "?"))
         if got == "pointer":
             print("          ^ declared fn-ptr must return T&/T*, NOT T by value")
+
+    print("\n=== hard-coded struct offsets ===")
+    errors += check_offsets(open(args.source, encoding="utf-8").read(),
+                            defsyms, data, addrs)
 
     print("\n%d hook(s), %d dlsym(s) checked, %d problem(s)." % (
         len(hooks), len(dlsyms), errors))

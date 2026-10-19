@@ -74,6 +74,12 @@ static QString    (*Content__getId)(const Content *, const QString &);
 static void       (*ReadingView__gotWordCounts)(ReadingView *, const QList<int> &);
 static int        (*ReadingView__chapterIndex)(ReadingView *);
 
+// Offset of the Volume/Content embedded in ReadingView. Firmware-specific:
+// ReadingView::updateWordCounts() computes it itself (`add.w rX, r0, #0x94`
+// on 5.18), and tools/check-symbols.py verifies this value against the
+// target firmware. A wrong offset hands getMimeType() a bogus `this`.
+static constexpr unsigned kReadingViewContentOffset = 0x94;
+
 // While set, isTolino() reports false so the reading-session tracking runs its
 // Kobo path on a Tolino. Scoped to the start/endReadingSession calls only.
 static bool g_force_kobo_session = false;
@@ -210,6 +216,18 @@ static struct nh_dlsym NickelReadingStatsDlsym[] = {
     },
     {0},
 };
+
+static const Content *reading_view_content(ReadingView *view) {
+    return reinterpret_cast<const Content *>(
+        reinterpret_cast<const char *>(view) + kReadingViewContentOffset);
+}
+
+// True for a sideloaded plain epub (not kepub). False if the MIME type
+// cannot be read.
+static bool is_plain_epub(ReadingView *view) {
+    return Content__getMimeType &&
+           Content__getMimeType(reading_view_content(view)) == QByteArray("application/epub+zip");
+}
 
 // A book is eligible for reading stats if it is reflowable.
 // Fixed-layout content is deliberately excluded.
@@ -355,12 +373,8 @@ _nh_ReadingView__mergedTOCAndSpineIndex(ReadingView *view) {
     if (!ReadingView__mergedTOCAndSpineIndex) {
         return 0;
     }
-    if (ReadingView__chapterIndex && Content__getMimeType) {
-        const Content *content = reinterpret_cast<const Content *>(
-            reinterpret_cast<const char *>(view) + 0x94);
-        if (Content__getMimeType(content) == QByteArray("application/epub+zip")) {
-            return ReadingView__chapterIndex(view);
-        }
+    if (ReadingView__chapterIndex && is_plain_epub(view)) {
+        return ReadingView__chapterIndex(view);
     }
     return ReadingView__mergedTOCAndSpineIndex(view);
 }
@@ -383,15 +397,11 @@ _nh_ReadingView__updateWordCounts(ReadingView *view) {
         return;  // fixed-layout content has no meaningful chapter bars
     }
 
-    // The Volume/Content the original reads is embedded at view + 0x94.
-    const Content *content = reinterpret_cast<const Content *>(
-        reinterpret_cast<const char *>(view) + 0x94);
-
-    if (Content__getMimeType(content) != QByteArray("application/epub+zip")) {
+    if (!is_plain_epub(view)) {
         return;  // kepub and other types are handled by nickel itself
     }
 
-    const QString id = Content__getId(content, QString());
+    const QString id = Content__getId(reading_view_content(view), QString());
     if (!id.startsWith(QLatin1String("file://"))) {
         return;  // not a sideloaded file (store content uses the kepub path)
     }
