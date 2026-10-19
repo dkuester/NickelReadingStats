@@ -110,7 +110,11 @@ Aufgaben:
   Kobo fehlendes Symbol nicht den ganzen Mod abschaltet.
 - [!] **KC3** Symbole, Return-Konventionen und Offset `0x94` gegen eine
   **Kobo**-5.x-`libnickel` prüfen (`check-symbols.py`).
-  *Blockiert: Kobo-5.x-Firmware liegt lokal nicht vor; Download nur mit Freigabe.*
+  *Blockiert: Kobo-5.x-Firmware liegt lokal nicht vor. Stand 2026-10-19:
+  Kobos Update-API (`UpgradeCheck`, Affiliates kobo/beta/fnac/rakutenbooks)
+  und pgaskins Firmware-Liste bieten für den Clara BW N365 (ID …391) nur bis
+  4.46.23836 (Aug. 2026, Qt5) an, für keine Geräte-ID eine 5.x. Einziger Weg:
+  `libnickel.so.1.0.0` von einem Gerät ziehen, auf dem bereits 5.x läuft.*
 - [!] **KC4** Smoke-Test auf einem Kobo mit 5.x. *Blockiert: kein Gerät mit 5.x.*
 - [ ] **KC5** README/Beschreibung: Kobo 5.18+ erst nach KC3/KC4 als
   unterstützt nennen.
@@ -145,3 +149,4 @@ Aufgaben:
 - 2026-10-19: W1–W4 und R4 erledigt (count_words neu, 44 Host-Checks).
 - 2026-10-19: M7 erledigt (BoundedZip, 8 MB/Eintrag, Tests mit Limit).
 - 2026-10-19: M6 erledigt (Hintergrund-Thread, Cache, Host-Test); N3 aufgenommen.
+- 2026-10-19: Suche nach Clara-BW-5.x-Firmware: öffentlich nicht verfügbar (KC3 bleibt blockiert).
