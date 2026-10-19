@@ -80,9 +80,23 @@ static int        (*ReadingView__chapterIndex)(ReadingView *);
 // target firmware. A wrong offset hands getMimeType() a bogus `this`.
 static constexpr unsigned kReadingViewContentOffset = 0x94;
 
-// While set, isTolino() reports false so the reading-session tracking runs its
-// Kobo path on a Tolino. Scoped to the start/endReadingSession calls only.
-static bool g_force_kobo_session = false;
+// While set, isTolino() reports false so the reading-life tracking runs its
+// Kobo path on a Tolino. Set only by ForceKoboScope around the EventEngine
+// calls below. thread_local: other threads (sync, store, DRM) asking
+// isTolino() at the same moment keep getting the real answer. Note the
+// window still covers everything those calls run synchronously on this
+// thread, e.g. directly connected slots of signals they emit.
+static thread_local bool g_force_kobo_session = false;
+
+// Sets g_force_kobo_session for one scope and restores the previous value
+// on exit, so nested calls (fireEventSlot inside a session call) are safe.
+struct ForceKoboScope {
+    bool prev;
+    ForceKoboScope() : prev(g_force_kobo_session) { g_force_kobo_session = true; }
+    ~ForceKoboScope() { g_force_kobo_session = prev; }
+    ForceKoboScope(const ForceKoboScope &) = delete;
+    ForceKoboScope &operator=(const ForceKoboScope &) = delete;
+};
 
 static struct nh_info NickelReadingStats = {
     .name = "NickelReadingStats",
@@ -266,11 +280,8 @@ _nh_EventEngine__startReadingSession(void *engine, void *volume, void *state, vo
     if (!EventEngine__startReadingSession) {
         return false;
     }
-    bool prev = g_force_kobo_session;
-    g_force_kobo_session = true;
-    bool ret = EventEngine__startReadingSession(engine, volume, state, map);
-    g_force_kobo_session = prev;
-    return ret;
+    ForceKoboScope scope;
+    return EventEngine__startReadingSession(engine, volume, state, map);
 }
 
 extern "C" __attribute__((visibility("default"))) bool
@@ -278,11 +289,8 @@ _nh_EventEngine__endReadingSession(void *engine, void *volume, void *state, void
     if (!EventEngine__endReadingSession) {
         return false;
     }
-    bool prev = g_force_kobo_session;
-    g_force_kobo_session = true;
-    bool ret = EventEngine__endReadingSession(engine, volume, state, map);
-    g_force_kobo_session = prev;
-    return ret;
+    ForceKoboScope scope;
+    return EventEngine__endReadingSession(engine, volume, state, map);
 }
 
 // fireEvent(char const*, Volume const&, QMap const&) is the page-turn ENTRY:
@@ -295,10 +303,8 @@ _nh_EventEngine__fireEvent(void *engine, void *name, void *volume, void *map) {
     if (!EventEngine__fireEvent) {
         return;
     }
-    bool prev = g_force_kobo_session;
-    g_force_kobo_session = true;
+    ForceKoboScope scope;
     EventEngine__fireEvent(engine, name, volume, map);
-    g_force_kobo_session = prev;
 }
 
 // fireEventSlot() is the Qt slot that dispatches every reading-life event
@@ -313,10 +319,8 @@ _nh_EventEngine__fireEventSlot(void *engine, void *name, void *volume, void *map
     if (!EventEngine__fireEventSlot) {
         return;
     }
-    bool prev = g_force_kobo_session;
-    g_force_kobo_session = true;
+    ForceKoboScope scope;
     EventEngine__fireEventSlot(engine, name, volume, map);
-    g_force_kobo_session = prev;
 }
 
 // Device::supportsActivityInMore() gates the "Activity" entry in the More

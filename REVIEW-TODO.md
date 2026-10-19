@@ -18,7 +18,7 @@ Status: `[ ]` offen · `[~]` in Arbeit · `[x]` erledigt · `[!]` blockiert (Gru
 - [x] **H1** Hartkodierter Offset `ReadingView + 0x94` (2×): benannte Konstante
   plus Helper. `check-symbols.py` soll den Offset per Disassembly von
   `updateWordCounts` mitprüfen (braucht die Firmware lokal).
-- [ ] **H2** `g_force_kobo_session`: `thread_local` und RAII-Guard statt
+- [x] **H2** `g_force_kobo_session`: `thread_local` und RAII-Guard statt
   4× kopiertem prev/set/restore. README-Aussage „nur während dieser Calls“
   präzisieren (synchrone Slots in `fireEventSlot` laufen mit).
 - [ ] **H2b** Auf dem Gerät prüfen, ob der Kobo-Event-Pfad Analytics/Netzwerk an
@@ -114,3 +114,4 @@ Aufgaben:
 - 2026-10-19: M4 erledigt (Activity-Eintrag fail-closed).
 - 2026-10-19: H3 erledigt (ein Eintrag pro Spine-Item, Prozent-Dekodierung).
 - 2026-10-19: H1 erledigt (Konstante + Helper, Offset-Check in check-symbols.py, gegen 5.18 grün).
+- 2026-10-19: H2 erledigt (thread_local, ForceKoboScope, README präzisiert).

@@ -43,14 +43,17 @@ Die drei Kennzahlen „Stunden gelesen", „Minuten pro Sitzung" und „Seiten p
 Minute" speist die Lesesitzungs-Erfassung (`startReadingSession`/
 `endReadingSession`). Die prüfen intern `isTolino()` und überspringen auf dem
 Tolino die komplette Kobo-Erfassung. Der Hook führt sie mit einem
-`g_force_kobo_session`-Flag aus, das `isTolino()` nur während dieser zwei
-Aufrufe `false` liefern lässt — der Rest des Geräts (Tolino-Shop/-Cloud/-DRM)
-behält sein normales Verhalten.
+thread-lokalen `g_force_kobo_session`-Flag aus, das `isTolino()` nur im
+aufrufenden Thread und nur während dieser Aufrufe `false` liefern lässt.
+Andere Threads und aller Code außerhalb dieser Aufrufe (Tolino-Shop/-Cloud/
+-DRM) sehen weiter den echten Wert. Einschränkung: Das Fenster umfasst alles,
+was diese Aufrufe synchron ausführen, auch direkt verbundene Slots von
+Signalen, die sie auslösen.
 
-Seitenumbrüche werden separat erfasst: Sie laufen über
-`EventEngine::fireEventSlot()`, das ebenfalls `isTolino()` prüft und auf dem
-Tolino abbricht. Der Hook führt es mit demselben Flag aus, damit Seitenwechsel
-gezählt werden.
+Seitenumbrüche werden separat erfasst: `ReadingView::onPageTurned()` ruft
+`EventEngine::fireEvent()` auf, das `EventEngine::fireEventSlot()` einplant.
+Beide prüfen `isTolino()` und brechen auf dem Tolino ab; der Hook führt beide
+mit demselben Flag aus, damit Seitenwechsel gezählt werden.
 
 Wichtig: Der „Aktivität"-Eintrag hängt an `supportsActivityInMore()`, das auf
 Tolino wegen `isTolino()` sofort `false` liefert — unabhängig von

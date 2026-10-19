@@ -41,13 +41,17 @@ The mod hooks:
 The three metrics "hours read", "minutes per session" and "pages per minute"
 are fed by the reading-session tracking (`startReadingSession`/
 `endReadingSession`). Those check `isTolino()` internally and skip the entire
-Kobo recording on a Tolino. The hook runs them with a `g_force_kobo_session`
-flag that makes `isTolino()` return `false` only during those calls — the rest
-of the device (Tolino store/cloud/DRM) keeps its normal behaviour.
+Kobo recording on a Tolino. The hook runs them with a thread-local
+`g_force_kobo_session` flag that makes `isTolino()` return `false` only on the
+calling thread and only while those calls run. Other threads, and all code
+outside these calls (Tolino store/cloud/DRM), keep the real value. Caveat: the
+window covers everything those calls do synchronously, including directly
+connected slots of signals they emit.
 
-Page turns are recorded separately: they are dispatched through
-`EventEngine::fireEventSlot()`, which also checks `isTolino()` and bails out on
-a Tolino. The hook runs it with the same flag so page turns are counted.
+Page turns are recorded separately: `ReadingView::onPageTurned()` calls
+`EventEngine::fireEvent()`, which schedules `EventEngine::fireEventSlot()`.
+Both check `isTolino()` and bail out on a Tolino, so the hook runs both with
+the same flag so page turns are counted.
 
 Important: the "Activity" entry depends on `supportsActivityInMore()`, which
 returns `false` on a Tolino because of `isTolino()` — independently of
