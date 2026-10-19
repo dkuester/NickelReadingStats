@@ -20,4 +20,5 @@ _ZNK6Device22supportsActivityInMoreEv
 _ZNK6Device24isParentalControlEnabledEv
 _ZNK6Device8isTolinoEv
 _ZNK7Content11getMimeTypeEv
+_ZNK7Content16getAccessibilityEv
 _ZNK7Content5getIdERK7QString

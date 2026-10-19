@@ -73,6 +73,7 @@ static QByteArray &(*Content__getMimeType)(const Content *);
 static QString    (*Content__getId)(const Content *, const QString &);
 static void       (*ReadingView__gotWordCounts)(ReadingView *, const QList<int> &);
 static int        (*ReadingView__chapterIndex)(ReadingView *);
+static int        (*Content__getAccessibility)(const Content *);
 
 // Offset of the Volume/Content embedded in ReadingView. Firmware-specific:
 // ReadingView::updateWordCounts() computes it itself (`add.w rX, r0, #0x94`
@@ -224,6 +225,12 @@ static struct nh_dlsym NickelReadingStatsDlsym[] = {
         .desc = "Deliver the computed word counts to the reading view",
     },
     {
+        .name     = "_ZNK7Content16getAccessibilityEv",
+        .out      = nh_symoutptr(Content__getAccessibility),
+        .desc     = "Apply the original accessibility check to plain epubs",
+        .optional = true,  // missing -> plain epubs get no stats (fail closed)
+    },
+    {
         .name = "_ZN11ReadingView12chapterIndexEv",
         .out  = nh_symoutptr(ReadingView__chapterIndex),
         .desc = "Raw spine chapter index (fallback for the merged TOC/spine index on epubs)",
@@ -243,10 +250,24 @@ static bool is_plain_epub(ReadingView *view) {
            Content__getMimeType(reading_view_content(view)) == QByteArray("application/epub+zip");
 }
 
-// A book is eligible for reading stats if it is reflowable.
-// Fixed-layout content is deliberately excluded.
+// The original ReadingView::supportsReadingStats() (5.18) is
+//     mime == kepub && content.getAccessibility() != 6
+//         && !<virtual at vtable+0x10c>() && !isFixedLayout()
+// This mirrors it for plain epubs: the kepub check becomes a plain-epub
+// check, the other guards stay. A kepub the original rejected stays
+// rejected. Anything that cannot be evaluated counts as unsupported (fail
+// closed). The virtual check is not replicated (unidentified).
+static constexpr int kAccessibilityNoStats = 6;  // state the original rejects
+
 static bool reading_stats_supported(ReadingView *view) {
-    if (ReadingView__isFixedLayout && ReadingView__isFixedLayout(view)) {
+    if (!is_plain_epub(view)) {
+        return false;
+    }
+    if (!ReadingView__isFixedLayout || ReadingView__isFixedLayout(view)) {
+        return false;
+    }
+    if (!Content__getAccessibility ||
+        Content__getAccessibility(reading_view_content(view)) == kAccessibilityNoStats) {
         return false;
     }
     return true;

@@ -40,6 +40,7 @@ EXPECTED = {
     "_ZNK7Content5getIdERK7QString": "sret",
     "_ZN11ReadingView13gotWordCountsERK5QListIiE": "simple",
     "_ZN11ReadingView12chapterIndexEv": "simple",
+    "_ZNK7Content16getAccessibilityEv": "simple",
 }
 
 

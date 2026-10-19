@@ -30,8 +30,11 @@ Status: `[ ]` offen · `[~]` in Arbeit · `[x]` erledigt · `[!]` blockiert (Gru
 
 - [x] **M4** `supportsActivityInMore`: fehlendes dlsym → fail-closed (Eintrag
   verbergen) statt fail-open (Jugendschutz).
-- [ ] **M5** `reading_stats_supported`: fail-closed, wenn `isFixedLayout` fehlt;
-  zusätzlich Whitelist der MIME-Typen (epub/kepub).
+- [x] **M5** `reading_stats_supported`: fail-closed, wenn `isFixedLayout` fehlt;
+  zusätzlich Whitelist der MIME-Typen (epub/kepub). *Umgesetzt als Nachbildung
+  des Originals (per Disassembly ermittelt): plain epub statt kepub,
+  `getAccessibility() != 6`, `!isFixedLayout()`. Die virtuelle Prüfung an
+  vtable+0x10c ist nicht nachgebildet (unbekannt) → N2.*
 - [ ] **M6** Wortzählung blockiert den UI-Thread: Cache (Pfad + mtime +
   Größe) und/oder Hintergrund-Thread.
 - [ ] **M7** Entpacken begrenzen: Einträge über einem Limit (z. B. 16 MB)
@@ -106,6 +109,17 @@ Aufgaben:
 - [ ] **KC5** README/Beschreibung: Kobo 5.18+ erst nach KC3/KC4 als
   unterstützt nennen.
 
+## Neue Befunde während der Umsetzung
+
+- [ ] **N1** `hasValidReadingStats` prüft im Original auf Tolino zusätzlich
+  `wordCountsReady()` und `0 <= mergedTOCAndSpineIndex() < wordCounts.size()`
+  (Feld `+0xac`). Der Hook überspringt diese Bereichsprüfung. Seit H3 und dem
+  `mergedTOC`-Fallback könnte das Original für plain epubs selbst `true`
+  liefern; auf dem Gerät prüfen, ob der Override noch nötig ist bzw. die
+  Bereichsprüfung nachbilden (Absturzrisiko bei Index ≥ Größe).
+- [ ] **N2** Virtuelle Methode an vtable+0x10c in `supportsReadingStats`
+  identifizieren (vtable von `ReadingView` auflösen) und ggf. nachbilden.
+
 ## Log
 
 - 2026-10-19: Datei angelegt, Branch `review/code-review-fixes` erstellt.
@@ -115,3 +129,4 @@ Aufgaben:
 - 2026-10-19: H3 erledigt (ein Eintrag pro Spine-Item, Prozent-Dekodierung).
 - 2026-10-19: H1 erledigt (Konstante + Helper, Offset-Check in check-symbols.py, gegen 5.18 grün).
 - 2026-10-19: H2 erledigt (thread_local, ForceKoboScope, README präzisiert).
+- 2026-10-19: M5 erledigt; neue Befunde N1, N2 aufgenommen.
