@@ -28,7 +28,7 @@ Status: `[ ]` offen · `[~]` in Arbeit · `[x]` erledigt · `[!]` blockiert (Gru
 
 ## Mittlere Priorität
 
-- [ ] **M4** `supportsActivityInMore`: fehlendes dlsym → fail-closed (Eintrag
+- [x] **M4** `supportsActivityInMore`: fehlendes dlsym → fail-closed (Eintrag
   verbergen) statt fail-open (Jugendschutz).
 - [ ] **M5** `reading_stats_supported`: fail-closed, wenn `isFixedLayout` fehlt;
   zusätzlich Whitelist der MIME-Typen (epub/kepub).
@@ -107,4 +107,5 @@ Aufgaben:
 
 - 2026-10-19: Datei angelegt, Branch `review/code-review-fixes` erstellt.
 - 2026-10-19: Rahmen auf Firmware 5.18+ festgelegt (Vorgabe des Users).
+- 2026-10-19: M4 erledigt (Activity-Eintrag fail-closed).
 - 2026-10-19: H3 erledigt (ein Eintrag pro Spine-Item, Prozent-Dekodierung).

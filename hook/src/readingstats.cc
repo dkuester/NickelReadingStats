@@ -308,19 +308,21 @@ _nh_EventEngine__fireEventSlot(void *engine, void *name, void *volume, void *map
 //     if (getDeviceClass() != 2) return false;
 //     return !isParentalControlEnabled();
 // We re-run the same checks but drop the isTolino() early-out, so the
-// device-class and parental-control guards are preserved.
+// device-class and parental-control guards are preserved. If either guard
+// cannot be evaluated, keep the entry hidden (fail closed): showing it would
+// bypass parental control.
 extern "C" __attribute__((visibility("default"))) bool
 _nh_Device__supportsActivityInMore(Device *device) {
     if (Device__supportsActivityInMore && Device__supportsActivityInMore(device)) {
         return true;
     }
-    if (Device__getDeviceClass && Device__getDeviceClass(device) != 2) {
+    if (!Device__getDeviceClass || !Device__isParentalControlEnabled) {
         return false;
     }
-    if (Device__isParentalControlEnabled && Device__isParentalControlEnabled(device)) {
+    if (Device__getDeviceClass(device) != 2) {
         return false;
     }
-    return true;
+    return !Device__isParentalControlEnabled(device);
 }
 
 extern "C" __attribute__((visibility("default"))) bool
