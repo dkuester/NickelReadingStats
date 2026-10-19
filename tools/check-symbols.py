@@ -6,14 +6,16 @@ exported-symbol list (defsyms.txt), both extracted from the target 5.18+
 firmware image (Tolino or Kobo).
 Neither file is committed (proprietary); keep them in a local scratch dir.
 
-Three checks:
+Four checks:
 1. Every `.sym` (hook) and `.name` (dlsym) mangled name in the source must
    exist in defsyms.txt. Catches typos and symbols that aren't in the firmware.
 2. Every dlsym symbol is disassembled and its return convention is classified
    (sret-by-value vs. pointer/reference-return). A dlsym'd fn-ptr declared
    with the WRONG convention crashes nickel at runtime (the getMimeType bug:
    declared `QByteArray` by value, but the symbol returns `QByteArray&`).
-3. Every hard-coded struct offset in the source (OFFSETS) matches the
+3. Hooked functions whose return value the hook forwards (HOOK_RETURNS)
+   return void/value as declared.
+4. Every hard-coded struct offset in the source (OFFSETS) matches the
    instruction that computes it in the firmware.
 
 Usage:
@@ -131,6 +133,55 @@ def classify(data, addr, next_addr):
     return "unknown"
 
 
+# Expected return kind of hooked functions whose return type matters (the
+# hook forwards it). "void" = r0 is not written before any return, "value" =
+# r0 is written right before a return. Return types are not in the mangled
+# name; endReadingSession was once declared bool although it returns int.
+HOOK_RETURNS = {
+    "_ZN11EventEngine19startReadingSessionER6VolumeRK11PluginState4QMapI7QString8QVariantE": "void",
+    "_ZN11EventEngine17endReadingSessionER6VolumeRK11PluginState4QMapI7QString8QVariantE": "value",
+    "_ZN11EventEngine9fireEventEPKcRK6VolumeRK4QMapI7QString8QVariantE": "void",
+    "_ZN11EventEngine13fireEventSlotE10QByteArray6Volume4QMapI7QString8QVariantE": "void",
+}
+
+R0_WRITERS = ("mov", "movs", "mov.w", "movw", "mvn", "mvns", "ldr", "ldr.w", "ldrb",
+              "ldrh", "uxtb", "uxth", "sxtb", "sxth", "adds", "add", "add.w",
+              "subs", "sub", "eor", "eors", "eor.w", "and", "ands", "orr", "orrs")
+
+
+def classify_return(data, addr, next_addr):
+    """'value' if r0 is written within the 3 instructions before a return,
+    'void' if returns exist and none of them is preceded by such a write,
+    'unknown' if no return was found (e.g. the body ends in a tail call)."""
+    md = Cs(CS_ARCH_ARM, CS_MODE_THUMB)
+    insns = list(md.disasm(data[addr:next_addr], addr))
+    returns = [i for i, ins in enumerate(insns)
+               if (ins.mnemonic.startswith("pop") and "pc" in ins.op_str)
+               or (ins.mnemonic == "bx" and ins.op_str == "lr")]
+    if not returns:
+        return "unknown"
+    for i in returns:
+        for ins in insns[max(0, i - 3):i]:
+            if ins.mnemonic in R0_WRITERS and re.match(r"r0\b", ins.op_str):
+                return "value"
+    return "void"
+
+
+def check_hook_returns(defsyms, data, addrs):
+    errors = 0
+    for sym, want in sorted(HOOK_RETURNS.items()):
+        if sym not in defsyms:
+            continue  # reported by the existence check
+        addr = defsyms[sym]
+        next_addr = next((a for a in addrs if a > addr), addr + 0x400)
+        got = classify_return(data, addr, next_addr)
+        status = "OK" if got == want else "MISMATCH"
+        if status != "OK":
+            errors += 1
+        print("  %-8s %-60s got=%-7s want=%s" % (status, sym[:60], got, want))
+    return errors
+
+
 # Struct offsets the hook hard-codes, verified against the instruction that
 # computes them inside a firmware function:
 #   source constant -> (function symbol, regex on the op_str of its add)
@@ -222,6 +273,9 @@ def main():
         print("  %-8s %-60s got=%-8s want=%s" % (status, name, got, want or "?"))
         if got == "pointer":
             print("          ^ declared fn-ptr must return T&/T*, NOT T by value")
+
+    print("\n=== hook return kind (void vs. value) ===")
+    errors += check_hook_returns(defsyms, data, addrs)
 
     print("\n=== hard-coded struct offsets ===")
     errors += check_offsets(open(args.source, encoding="utf-8").read(),

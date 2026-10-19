@@ -67,8 +67,15 @@ static bool (*Device__supportsReadingLife)(Device *);
 static bool (*Device__supportsActivityInMore)(Device *);
 static bool (*Device__isTolino)(Device *);
 static bool (*FeatureSettings__bookSpecificStatsEnabled)(FeatureSettings *);
-static bool (*EventEngine__startReadingSession)(void *, void *, void *, void *);
-static bool (*EventEngine__endReadingSession)(void *, void *, void *, void *);
+// EventEngine signatures (ARM EABI): the Volume/PluginState references are
+// pointers, and a QByteArray/Volume/QMap passed BY VALUE (non-trivial types)
+// is passed as a hidden pointer to a caller-owned copy, so each argument is
+// one void*. Return types are not in the mangled names; from 5.18
+// disassembly: startReadingSession/fireEvent/fireEventSlot leave r0 unset
+// (void), endReadingSession returns QDateTime::secsTo() truncated to int
+// (session seconds). tools/check-symbols.py verifies void vs. value.
+static void (*EventEngine__startReadingSession)(void *, void *, void *, void *);
+static int  (*EventEngine__endReadingSession)(void *, void *, void *, void *);
 static void (*EventEngine__fireEvent)(void *, void *, void *, void *);
 static void (*EventEngine__fireEventSlot)(void *, void *, void *, void *);
 
@@ -328,19 +335,21 @@ _nh_Device__isTolino(Device *device) {
 // startReadingSession/endReadingSession call isTolino() themselves and skip
 // the whole Kobo session path on a Tolino. We run them with isTolino() forced
 // to false so that path executes and records the Activity data.
-extern "C" __attribute__((visibility("default"))) bool
+extern "C" __attribute__((visibility("default"))) void
 _nh_EventEngine__startReadingSession(void *engine, void *volume, void *state, void *map) {
     if (!EventEngine__startReadingSession) {
-        return false;
+        return;
     }
     ForceKoboScope scope;
-    return EventEngine__startReadingSession(engine, volume, state, map);
+    EventEngine__startReadingSession(engine, volume, state, map);
 }
 
-extern "C" __attribute__((visibility("default"))) bool
+// Returns the session length in seconds; it must be passed through as int
+// (declaring it bool would let the compiler hand back only 0/1 or a byte).
+extern "C" __attribute__((visibility("default"))) int
 _nh_EventEngine__endReadingSession(void *engine, void *volume, void *state, void *map) {
     if (!EventEngine__endReadingSession) {
-        return false;
+        return 0;
     }
     ForceKoboScope scope;
     return EventEngine__endReadingSession(engine, volume, state, map);

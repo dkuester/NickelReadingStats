@@ -44,8 +44,12 @@ Status: `[ ]` offen · `[~]` in Arbeit · `[x]` erledigt · `[!]` blockiert (Gru
   überspringen bzw. mit `0` zählen. *Umgesetzt mit 8 MB pro Eintrag
   (`kMaxEpubEntryBytes`), geprüft gegen die unkomprimierte Größe im
   ZIP-Header vor dem Entpacken.*
-- [ ] **M8** Hook-Signaturen dokumentieren und prüfen (Rückgabetyp von
-  `start/endReadingSession`, Wertparameter von `fireEventSlot`).
+- [x] **M8** Hook-Signaturen dokumentieren und prüfen (Rückgabetyp von
+  `start/endReadingSession`, Wertparameter von `fireEventSlot`). *Befund per
+  Disassembly: `startReadingSession` ist `void`, `endReadingSession` gibt
+  `int` (Sekunden aus `QDateTime::secsTo`) zurück – war als `bool`
+  deklariert. Korrigiert; `check-symbols.py` prüft jetzt void/value der
+  EventEngine-Hooks.*
 
 ## Genauigkeit der Wortzählung
 
@@ -151,3 +155,4 @@ Aufgaben:
 - 2026-10-19: M6 erledigt (Hintergrund-Thread, Cache, Host-Test); N3 aufgenommen.
 - 2026-10-19: Suche nach Clara-BW-5.x-Firmware: öffentlich nicht verfügbar (KC3 bleibt blockiert).
 - 2026-10-19: K1, K2, K5 erledigt (Kopfkommentar, „5.18+“ einheitlich, Fallbacks dokumentiert).
+- 2026-10-19: M8 erledigt (Rückgabetypen korrigiert, HOOK_RETURNS-Check).
