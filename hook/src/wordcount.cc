@@ -11,13 +11,54 @@
 #include "wordcount_logic.h"
 
 #include <QByteArray>
+#include <QHash>
 #include <QXmlStreamReader>
 #include <QtGui/private/qzipreader_p.h>
 
-// Locate the OPF path: META-INF/container.xml first, then *.opf fallback.
-static QString find_opf(QZipReader &zip)
+namespace {
+
+// A QZipReader that refuses entries larger than a size limit.
+class BoundedZip
 {
-    const QByteArray container = zip.fileData(QStringLiteral("META-INF/container.xml"));
+public:
+    BoundedZip(const QString &path, qint64 max_entry_bytes)
+        : zip_(path), max_(max_entry_bytes)
+    {
+        if (!zip_.isReadable()) {
+            return;
+        }
+        const auto infos = zip_.fileInfoList();
+        for (const QZipReader::FileInfo &fi : infos) {
+            if (!fi.isDir) {
+                sizes_.insert(fi.filePath, fi.size);
+            }
+        }
+    }
+
+    bool isReadable() const { return zip_.isReadable(); }
+    const QHash<QString, qint64> &entries() const { return sizes_; }
+
+    // Empty if the entry is missing or over the limit (checked against the
+    // header's uncompressed size, before anything is inflated).
+    QByteArray read(const QString &path)
+    {
+        const auto it = sizes_.constFind(path);
+        if (it == sizes_.constEnd() || *it > max_) {
+            return QByteArray();
+        }
+        return zip_.fileData(path);
+    }
+
+private:
+    QZipReader zip_;
+    qint64 max_;
+    QHash<QString, qint64> sizes_;
+};
+
+// Locate the OPF path: META-INF/container.xml first, then *.opf fallback.
+QString find_opf(BoundedZip &zip)
+{
+    const QByteArray container = zip.read(QStringLiteral("META-INF/container.xml"));
     if (!container.isEmpty()) {
         QXmlStreamReader xml(container);
         while (!xml.atEnd()) {
@@ -30,19 +71,20 @@ static QString find_opf(QZipReader &zip)
             }
         }
     }
-    const auto infos = zip.fileInfoList();
-    for (const QZipReader::FileInfo &fi : infos) {
-        if (fi.filePath.endsWith(QLatin1String(".opf"), Qt::CaseInsensitive)) {
-            return fi.filePath;
+    for (auto it = zip.entries().constBegin(); it != zip.entries().constEnd(); ++it) {
+        if (it.key().endsWith(QLatin1String(".opf"), Qt::CaseInsensitive)) {
+            return it.key();
         }
     }
     return QString();
 }
 
-QList<int> count_epub_words(const QString &epub_path)
+} // namespace
+
+QList<int> count_epub_words(const QString &epub_path, qint64 max_entry_bytes)
 {
     QList<int> counts;
-    QZipReader zip(epub_path);
+    BoundedZip zip(epub_path, max_entry_bytes);
     if (!zip.isReadable()) {
         return counts;
     }
@@ -52,7 +94,7 @@ QList<int> count_epub_words(const QString &epub_path)
         return counts;
     }
 
-    const QByteArray opf = zip.fileData(opf_path);
+    const QByteArray opf = zip.read(opf_path);
     if (opf.isEmpty()) {
         return counts;
     }
@@ -68,9 +110,10 @@ QList<int> count_epub_words(const QString &epub_path)
 
     // Exactly one entry per spine item, in spine order: Nickel indexes the list
     // by spine position (chapter bars, mergedTOCAndSpineIndex fallback), so a
-    // missing or empty file must count as 0 rather than shift the rest.
+    // missing, empty or oversized file must count as 0 rather than shift the
+    // rest.
     for (const QString &href : spine_hrefs) {
-        const QByteArray xhtml = zip.fileData(join_path(opf_dir, href));
+        const QByteArray xhtml = zip.read(join_path(opf_dir, href));
         counts.append(xhtml.isEmpty() ? 0 : count_words(QString::fromUtf8(xhtml)));
     }
     // Nothing readable at all: report "no data" instead of an all-zero list.

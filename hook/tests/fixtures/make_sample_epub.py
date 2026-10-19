@@ -8,6 +8,7 @@ Spine (expected word counts in brackets):
   c3   ch3.xhtml            [3]
   c4   Text/Kapitel%204.xhtml [2] subfolder + percent-encoded href
                                  -> "OEBPS/Text/Kapitel 4.xhtml"
+  c5   big.xhtml            [600] ~3 KB, for the per-entry size limit
 
 Every chapter has a <head><title> whose words must NOT be counted.
 
@@ -37,6 +38,7 @@ OPF = """<?xml version="1.0" encoding="UTF-8"?>
     <item id="gone" href="missing.xhtml" media-type="application/xhtml+xml"/>
     <item id="c3" href="ch3.xhtml" media-type="application/xhtml+xml"/>
     <item id="c4" href="Text/Kapitel%204.xhtml" media-type="application/xhtml+xml"/>
+    <item id="c5" href="big.xhtml" media-type="application/xhtml+xml"/>
   </manifest>
   <spine>
     <itemref idref="c1"/>
@@ -44,6 +46,7 @@ OPF = """<?xml version="1.0" encoding="UTF-8"?>
     <itemref idref="gone"/>
     <itemref idref="c3"/>
     <itemref idref="c4"/>
+    <itemref idref="c5"/>
   </spine>
 </package>
 """
@@ -74,6 +77,7 @@ def main():
         add(z, "OEBPS/ch2.xhtml", xhtml("<p>epsilon zeta</p>"))
         add(z, "OEBPS/ch3.xhtml", xhtml("<p>eta theta iota</p>"))
         add(z, "OEBPS/Text/Kapitel 4.xhtml", xhtml("<p>kappa lambda</p>"))
+        add(z, "OEBPS/big.xhtml", xhtml("<p>%s</p>" % " ".join(["word"] * 600)))
 
 if __name__ == "__main__":
     main()

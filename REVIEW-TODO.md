@@ -37,8 +37,10 @@ Status: `[ ]` offen · `[~]` in Arbeit · `[x]` erledigt · `[!]` blockiert (Gru
   vtable+0x10c ist nicht nachgebildet (unbekannt) → N2.*
 - [ ] **M6** Wortzählung blockiert den UI-Thread: Cache (Pfad + mtime +
   Größe) und/oder Hintergrund-Thread.
-- [ ] **M7** Entpacken begrenzen: Einträge über einem Limit (z. B. 16 MB)
-  überspringen bzw. mit `0` zählen.
+- [x] **M7** Entpacken begrenzen: Einträge über einem Limit (z. B. 16 MB)
+  überspringen bzw. mit `0` zählen. *Umgesetzt mit 8 MB pro Eintrag
+  (`kMaxEpubEntryBytes`), geprüft gegen die unkomprimierte Größe im
+  ZIP-Header vor dem Entpacken.*
 - [ ] **M8** Hook-Signaturen dokumentieren und prüfen (Rückgabetyp von
   `start/endReadingSession`, Wertparameter von `fireEventSlot`).
 
@@ -133,3 +135,4 @@ Aufgaben:
 - 2026-10-19: M5 erledigt; neue Befunde N1, N2 aufgenommen.
 - 2026-10-19: KC1, KC2 (alle Hooks/dlsyms optional), K3 (README-Limits neu) erledigt.
 - 2026-10-19: W1–W4 und R4 erledigt (count_words neu, 44 Host-Checks).
+- 2026-10-19: M7 erledigt (BoundedZip, 8 MB/Eintrag, Tests mit Limit).
