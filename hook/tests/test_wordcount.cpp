@@ -72,6 +72,10 @@ int main()
     CHECK_EQ(join_path(QString("OEBPS/text"), QString("../images/x.jpg")), QString("OEBPS/images/x.jpg"));
     CHECK_EQ(join_path(QString("OEBPS"), QString("../toc.xhtml")), QString("toc.xhtml"));
     CHECK_EQ(join_path(QString("OEBPS"), QString("a/../b.xhtml")), QString("OEBPS/b.xhtml"));
+    // "." and ".." are collapsed with the OPF at the zip root too
+    CHECK_EQ(join_path(QString(), QString("./ch1.xhtml")), QString("ch1.xhtml"));
+    CHECK_EQ(join_path(QString(), QString("a/../b.xhtml")), QString("b.xhtml"));
+    CHECK_EQ(join_path(QString("OEBPS"), QString("/x/../y.xhtml")), QString("y.xhtml"));
     // hrefs are URLs: percent-encoded names resolve to the literal zip entry
     CHECK_EQ(join_path(QString("OEBPS"), QString("Kapitel%201.xhtml")), QString("OEBPS/Kapitel 1.xhtml"));
     CHECK_EQ(join_path(QString("OEBPS"), QString("%C3%BCber.xhtml")), QString::fromUtf8("OEBPS/\xc3\xbc" "ber.xhtml"));
@@ -110,6 +114,25 @@ int main()
     {
         CHECK_EQ(parse_spine(QByteArray()).size(), 0);
     }
+    {
+        // linear="no" items stay in the spine (Nickel indexes by position)
+        const QByteArray opf =
+            "<package><manifest><item id=\"a\" href=\"a.xhtml\"/>"
+            "<item id=\"n\" href=\"notes.xhtml\"/><item id=\"b\" href=\"b.xhtml\"/></manifest>"
+            "<spine><itemref idref=\"a\"/><itemref idref=\"n\" linear=\"no\"/>"
+            "<itemref idref=\"b\"/></spine></package>";
+        const QStringList spine = parse_spine(opf);
+        CHECK_EQ(spine.size(), 3);
+        CHECK_EQ(spine.value(1), QString("notes.xhtml"));
+    }
+
+    // --- decode_xhtml: UTF-8 (with/without BOM) and UTF-16 by BOM ---
+    CHECK_EQ(decode_xhtml(QByteArray("\xEF\xBB\xBF" "a b")), QString("a b"));
+    CHECK_EQ(decode_xhtml(QByteArray("a b")), QString("a b"));
+    CHECK_EQ(decode_xhtml(QByteArray("\xFF\xFE" "a\0 \0b\0", 8)), QString("a b"));
+    CHECK_EQ(decode_xhtml(QByteArray("\xFE\xFF" "\0a\0 \0b", 8)), QString("a b"));
+    CHECK_EQ(decode_xhtml(QByteArray("\xFF\xFE" "\xFC\0", 4)), QString::fromUtf8("\xC3\xBC"));
+    CHECK_EQ(count_words(decode_xhtml(QByteArray("\xFF\xFE" "<\0p\0>\0x\0 \0y\0<\0/\0p\0>\0", 22))), 2);
 
     std::printf("%d checks, %d failure(s)\n", g_checks, g_failures);
     return g_failures == 0 ? 0 : 1;

@@ -123,21 +123,19 @@ inline int count_words(const QString &html)
 
 // Resolve a manifest href (relative to the OPF directory) to a zip path.
 // Manifest hrefs are URLs, so "Chapter%201.xhtml" names the zip entry
-// "Chapter 1.xhtml": percent-decode before joining.
+// "Chapter 1.xhtml": percent-decode before joining. "." and ".." are
+// collapsed in every case (also with the OPF at the zip root).
 inline QString join_path(const QString &opf_dir, const QString &raw_href)
 {
     const QString href = QUrl::fromPercentEncoding(raw_href.toUtf8());
-    if (href.startsWith(QLatin1Char('/'))) {
-        return href.mid(1);
+    QString joined;
+    if (href.startsWith(QLatin1Char('/')) || opf_dir.isEmpty()) {
+        joined = href;
+    } else {
+        joined = opf_dir + QLatin1Char('/') + href;
     }
-    if (opf_dir.isEmpty()) {
-        return href;
-    }
-    QString joined = opf_dir + QLatin1Char('/') + href;
-    // Collapse a/./b and a/../b without touching the leading component.
-    QStringList parts = joined.split(QLatin1Char('/'), Qt::SkipEmptyParts);
     QStringList out;
-    for (const QString &p : parts) {
+    for (const QString &p : joined.split(QLatin1Char('/'), Qt::SkipEmptyParts)) {
         if (p == QLatin1String(".")) {
             continue;
         }
@@ -152,7 +150,32 @@ inline QString join_path(const QString &opf_dir, const QString &raw_href)
     return out.join(QLatin1Char('/'));
 }
 
-// Parse the OPF and return spine hrefs in reading order.
+// Decode an XHTML file: EPUB allows UTF-8 and UTF-16, told apart by the
+// byte order mark. No BOM means UTF-8.
+inline QString decode_xhtml(const QByteArray &bytes)
+{
+    const auto byte = [&bytes](int i) { return static_cast<unsigned char>(bytes.at(i)); };
+    if (bytes.size() >= 2 && ((byte(0) == 0xFF && byte(1) == 0xFE) ||
+                              (byte(0) == 0xFE && byte(1) == 0xFF))) {
+        const bool little = byte(0) == 0xFF;
+        QString text;
+        text.reserve((bytes.size() - 2) / 2);
+        for (int i = 2; i + 1 < bytes.size(); i += 2) {
+            const ushort unit = little ? ushort(byte(i) | (byte(i + 1) << 8))
+                                       : ushort((byte(i) << 8) | byte(i + 1));
+            text.append(QChar(unit));
+        }
+        return text;
+    }
+    if (bytes.startsWith("\xEF\xBB\xBF")) {
+        return QString::fromUtf8(bytes.constData() + 3, bytes.size() - 3);
+    }
+    return QString::fromUtf8(bytes);
+}
+
+// Parse the OPF and return spine hrefs in reading order. Non-linear items
+// (linear="no") are kept on purpose: Nickel indexes the word-count list by
+// spine position, so dropping them would shift every later chapter.
 inline QStringList parse_spine(const QByteArray &opf)
 {
     QHash<QString, QString> manifest; // id -> href

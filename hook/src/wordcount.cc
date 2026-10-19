@@ -114,7 +114,7 @@ QList<int> count_epub_words(const QString &epub_path, qint64 max_entry_bytes)
     // rest.
     for (const QString &href : spine_hrefs) {
         const QByteArray xhtml = zip.read(join_path(opf_dir, href));
-        counts.append(xhtml.isEmpty() ? 0 : count_words(QString::fromUtf8(xhtml)));
+        counts.append(xhtml.isEmpty() ? 0 : count_words(decode_xhtml(xhtml)));
     }
     // Nothing readable at all: report "no data" instead of an all-zero list.
     for (const int c : counts) {

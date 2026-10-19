@@ -58,8 +58,10 @@ Status: `[ ]` offen · `[~]` in Arbeit · `[x]` erledigt · `[!]` blockiert (Gru
   `<!-- … -->` vor dem Tag-Strip entfernen.
 - [x] **W3** Reine Satzzeichen-Tokens nicht als Wort zählen (`* * *`, `—`).
 - [x] **W4** Weitere Entities: `&#xa0;`, `&thinsp;`, `&ensp;`, `&emsp;`.
-- [ ] **W5** Kleinkram: Encoding-Erkennung, `linear="no"`, `join_path`
-  normalisiert bei leerem `opf_dir` nicht.
+- [x] **W5** Kleinkram: Encoding-Erkennung, `linear="no"`, `join_path`
+  normalisiert bei leerem `opf_dir` nicht. *UTF-16 per BOM (`decode_xhtml`),
+  `linear="no"` bleibt bewusst drin (Spine-Indizes), `join_path` normalisiert
+  immer.*
 
 ## Konsistenz und Doku
 
@@ -157,3 +159,4 @@ Aufgaben:
 - 2026-10-19: K1, K2, K5 erledigt (Kopfkommentar, „5.18+“ einheitlich, Fallbacks dokumentiert).
 - 2026-10-19: M8 erledigt (Rückgabetypen korrigiert, HOOK_RETURNS-Check).
 - 2026-10-19: K6, R3 erledigt (tools/nhsyms.py, ELF-Segment-Mapping, Thumb-Bit, Namenslisten).
+- 2026-10-19: W5 erledigt (55 Host-Checks).
