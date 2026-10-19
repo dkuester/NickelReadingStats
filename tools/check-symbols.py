@@ -37,6 +37,7 @@ EXPECTED = {
     "_ZNK7Content11getMimeTypeEv": "pointer",
     "_ZNK7Content5getIdERK7QString": "sret",
     "_ZN11ReadingView13gotWordCountsERK5QListIiE": "simple",
+    "_ZN11ReadingView12chapterIndexEv": "simple",
 }
 
 
@@ -159,8 +160,16 @@ def main():
         next_addr = next((a for a in addrs if a > addr), addr + 0x120)
         got = classify(data, addr, next_addr)
         want = EXPECTED.get(name)
-        status = "OK" if (want is None or got == want) else "MISMATCH"
-        if status == "MISMATCH":
+        # A dlsym without a recorded expectation is an error too: otherwise a
+        # new symbol silently skips the convention check that caught the
+        # getMimeType crash. Disassemble it, then add it to EXPECTED.
+        if want is None:
+            status = "NOEXPECT"
+        elif got == want:
+            status = "OK"
+        else:
+            status = "MISMATCH"
+        if status != "OK":
             errors += 1
         print("  %-8s %-60s got=%-8s want=%s" % (status, name, got, want or "?"))
         if got == "pointer":

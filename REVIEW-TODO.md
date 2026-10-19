@@ -55,17 +55,20 @@ Status: `[ ]` offen · `[~]` in Arbeit · `[x]` erledigt · `[!]` blockiert (Gru
   unvollständig).
 - [ ] **K2** Versionsangaben vereinheitlichen („5.18+/6.x“ vs. „5.18“).
 - [ ] **K3** README: doppelter Fixed-Layout-Absatz.
-- [ ] **K4** `chapterIndex` fehlt in `EXPECTED` von `check-symbols.py`;
-  Symbole ohne Erwartung sollen als Fehler zählen.
+- [x] **K4** `chapterIndex` fehlt in `EXPECTED` von `check-symbols.py`;
+  Symbole ohne Erwartung sollen als Fehler zählen. *Gegen Tolino-5.18-
+  `libnickel` (BuildID bcfe1a2b…) geprüft: 19/19 Symbole, 7/7 Konventionen OK.*
 - [ ] **K5** Tote Fallbacks (`!Device__isTolino` → `true`, `mergedTOC` → `0`)
   aufräumen oder kommentieren.
 - [ ] **K6** `extract()` aus beiden Python-Tools in ein gemeinsames Modul.
 
 ## Repo, CI, Tools
 
-- [ ] **R1** `tools/__pycache__/*.pyc` aus Git entfernen und ignorieren.
+- [x] **R1** `tools/__pycache__/*.pyc` aus Git entfernen und ignorieren.
 - [ ] **R2** CI-Job mit Qt6 zusätzlich zu Qt5.
-- [ ] **R3** `check-symbols.py`: VMA ≠ Datei-Offset und Thumb-Bit prüfen;
+- [ ] **R3** `check-symbols.py`: VMA ≠ Datei-Offset und Thumb-Bit prüfen
+  *(für Tolino 5.18 unkritisch: `llvm-nm` liefert gerade Adressen, alle
+  Klassifikationen stimmen; für andere Binaries absichern)*;
   `defsyms.txt` mit nur einer Spalte (reine Namensliste) unterstützen.
 - [~] **R4** Fixture erweitern: `mimetype`, `<title>`, Unterordner,
   prozent-kodierter Href, fehlende Spine-Datei. *Erledigt: `mimetype`,
@@ -107,5 +110,6 @@ Aufgaben:
 
 - 2026-10-19: Datei angelegt, Branch `review/code-review-fixes` erstellt.
 - 2026-10-19: Rahmen auf Firmware 5.18+ festgelegt (Vorgabe des Users).
+- 2026-10-19: R1, K4 erledigt; check-symbols.py lokal grün gegen 5.18.
 - 2026-10-19: M4 erledigt (Activity-Eintrag fail-closed).
 - 2026-10-19: H3 erledigt (ein Eintrag pro Spine-Item, Prozent-Dekodierung).
