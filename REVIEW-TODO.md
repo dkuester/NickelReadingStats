@@ -57,7 +57,7 @@ Status: `[ ]` offen · `[~]` in Arbeit · `[x]` erledigt · `[!]` blockiert (Gru
 - [ ] **K1** Kopfkommentar in `readingstats.cc` („two gates“ vs. 3, Hook-Liste
   unvollständig).
 - [ ] **K2** Versionsangaben vereinheitlichen („5.18+/6.x“ vs. „5.18“).
-- [ ] **K3** README: doppelter Fixed-Layout-Absatz.
+- [x] **K3** README: doppelter Fixed-Layout-Absatz.
 - [x] **K4** `chapterIndex` fehlt in `EXPECTED` von `check-symbols.py`;
   Symbole ohne Erwartung sollen als Fehler zählen. *Gegen Tolino-5.18-
   `libnickel` (BuildID bcfe1a2b…) geprüft: 19/19 Symbole, 7/7 Konventionen OK.*
@@ -98,9 +98,12 @@ Stand der Analyse:
 
 Aufgaben:
 
-- [ ] **KC1** Code-Pfade auf Kobo-Tauglichkeit prüfen; nichts darf von
-  `isTolino() == true` abhängen.
-- [ ] **KC2** Nicht-essenzielle Hooks als `optional` markieren, damit ein auf
+- [x] **KC1** Code-Pfade auf Kobo-Tauglichkeit prüfen; nichts darf von
+  `isTolino() == true` abhängen. *Ergebnis: Tolino-Hooks (`supportsReadingLife`,
+  `isTolino`, `EventEngine`, `supportsActivityInMore`) liefern auf Kobo
+  dasselbe wie das Original; EPUB-Erweiterungen wirken auf beiden;
+  `bookSpecificStatsEnabled` wird auf beiden erzwungen (gewollt).*
+- [x] **KC2** Nicht-essenzielle Hooks als `optional` markieren, damit ein auf
   Kobo fehlendes Symbol nicht den ganzen Mod abschaltet.
 - [!] **KC3** Symbole, Return-Konventionen und Offset `0x94` gegen eine
   **Kobo**-5.x-`libnickel` prüfen (`check-symbols.py`).
@@ -130,3 +133,4 @@ Aufgaben:
 - 2026-10-19: H1 erledigt (Konstante + Helper, Offset-Check in check-symbols.py, gegen 5.18 grün).
 - 2026-10-19: H2 erledigt (thread_local, ForceKoboScope, README präzisiert).
 - 2026-10-19: M5 erledigt; neue Befunde N1, N2 aufgenommen.
+- 2026-10-19: KC1, KC2 (alle Hooks/dlsyms optional), K3 (README-Limits neu) erledigt.

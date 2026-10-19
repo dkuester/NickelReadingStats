@@ -60,10 +60,12 @@ re-runs the original check (`!isTolino() && deviceClass == 2 &&
 !ParentalControl`) but drops only the `isTolino()` gate; the device-class and
 parental-control guards remain.
 
-Fixed-layout content (fixed-layout EPUBs, PDF, comics) is deliberately
-excluded — `ReadingView::isFixedLayout()` is resolved via `dlsym` for that. The
-hooks call the original function first and only intervene when Nickel itself
-returns `false`, so existing behaviour (e.g. kepub on Kobo) is unchanged.
+Which books get stats: the hooks call the original function first and keep a
+`true`. Otherwise they apply the original `supportsReadingStats()` rule with
+only its kepub requirement replaced by "plain EPUB" (`application/epub+zip`):
+the content's accessibility state must not be 6 and the book must not be
+fixed-layout. Fixed-layout content (fixed-layout EPUBs, PDF, comics) and other
+formats stay excluded, and a kepub that Nickel rejects stays rejected.
 
 ## Word counting for regular EPUBs
 
@@ -88,12 +90,12 @@ one bar — that is correct, not an empty view.
 
 ## Limits ("robust" here means: degrade gracefully, don't crash)
 
-Fixed-layout content (fixed-layout EPUBs, PDF, comics) is deliberately
-excluded — `ReadingView::isFixedLayout()` is resolved via `dlsym` for that.
-Word counting only runs when all dlsym targets are present; if one is missing
-it is silently skipped rather than crashing. The hooks call the original
-function first and only intervene when Nickel provides nothing, so existing
-behaviour (e.g. kepub on Kobo) is unchanged.
+Every hook and `dlsym` target is marked optional: if a 5.18+ build lacks a
+symbol, only the feature that needs it is lost instead of the whole mod
+(NickelHook logs each unresolved symbol). Checks that cannot be evaluated fail
+closed — no stats, no Activity entry — rather than open. Existing behaviour
+(e.g. kepub on Kobo) is unchanged because the original function always runs
+first.
 
 ## Building
 

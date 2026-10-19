@@ -62,11 +62,14 @@ Hook führt die ursprüngliche Prüfung (`!isTolino() && deviceClass == 2 &&
 !ParentalControl`) erneut aus, lässt aber nur die `isTolino()`-Sperre weg;
 Geräteklasse und Jugendschutz bleiben erhalten.
 
-Fixed-Layout-Inhalte (Fixed-Layout-EPUBs, PDF, Comics) bleiben bewusst
-ausgeschlossen — dafür wird `ReadingView::isFixedLayout()` via `dlsym`
-aufgelöst. Die Hooks rufen zuerst die Originalfunktion auf und greifen nur
-ein, wenn Nickel selbst `false` liefert; dadurch bleibt bestehendes
-Verhalten (z. B. kepub auf Kobo) unverändert.
+Welche Bücher Stats bekommen: Die Hooks rufen zuerst die Originalfunktion
+auf und übernehmen ein `true`. Andernfalls wenden sie die Regel des
+Originals `supportsReadingStats()` an, bei der nur die kepub-Bedingung durch
+„normales EPUB“ (`application/epub+zip`) ersetzt ist: Der
+Accessibility-Status des Inhalts darf nicht 6 sein, und das Buch darf kein
+Fixed-Layout sein. Fixed-Layout-Inhalte (Fixed-Layout-EPUBs, PDF, Comics) und
+andere Formate bleiben ausgeschlossen; ein kepub, das Nickel ablehnt, bleibt
+abgelehnt.
 
 ## Wortzählung für normale EPUBs
 
@@ -92,13 +95,12 @@ korrekt, keine leere Anzeige.
 
 ## Grenzen („robust" heißt hier: sauber degradieren, nicht abstürzen)
 
-Fixed-Layout-Inhalte (Fixed-Layout-EPUBs, PDF, Comics) bleiben bewusst
-ausgeschlossen — dafür wird `ReadingView::isFixedLayout()` via `dlsym`
-aufgelöst. Die Wortzählung wird nur angestoßen, wenn alle dlsym-Ziele
-vorhanden sind; fehlt etwas, wird sie still übersprungen statt zu crashen.
-Die Hooks rufen zuerst die Originalfunktion auf und greifen nur ein, wenn
-Nickel selbst nichts liefert; dadurch bleibt bestehendes Verhalten
-(z. B. kepub auf Kobo) unverändert.
+Alle Hooks und `dlsym`-Ziele sind optional: Fehlt einem 5.18+-Build ein
+Symbol, entfällt nur das Feature, das es braucht, nicht das ganze Mod
+(NickelHook protokolliert jedes nicht gefundene Symbol). Prüfungen, die sich
+nicht auswerten lassen, schlagen geschlossen fehl — keine Stats, kein
+Aktivität-Eintrag — statt offen. Bestehendes Verhalten (z. B. kepub auf Kobo)
+bleibt unverändert, weil immer zuerst die Originalfunktion läuft.
 
 ## Bauen
 

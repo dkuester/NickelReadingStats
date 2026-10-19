@@ -105,6 +105,10 @@ static struct nh_info NickelReadingStats = {
     .uninstall_flag = "/mnt/onboard/readingstats_uninstall",
 };
 
+// Every hook and dlsym is optional: each feature degrades on its own (every
+// call through a resolved pointer is NULL-checked, guards fail closed), so a
+// symbol missing on some 5.18+ build disables that feature only instead of
+// the whole mod. NickelHook logs every symbol it could not resolve.
 static struct nh_hook NickelReadingStatsHook[] = {
     {
         .sym     = "_ZNK6Device19supportsReadingLifeEv",
@@ -112,6 +116,7 @@ static struct nh_hook NickelReadingStatsHook[] = {
         .lib     = "libnickel.so.1.0.0",
         .out     = nh_symoutptr(Device__supportsReadingLife),
         .desc    = "Re-enable the reading stats feature on Tolino devices",
+        .optional = true,
     },
     {
         .sym     = "_ZNK6Device8isTolinoEv",
@@ -119,6 +124,7 @@ static struct nh_hook NickelReadingStatsHook[] = {
         .lib     = "libnickel.so.1.0.0",
         .out     = nh_symoutptr(Device__isTolino),
         .desc    = "Report 'not Tolino' only while a reading session is tracked",
+        .optional = true,
     },
     {
         .sym     = "_ZNK6Device22supportsActivityInMoreEv",
@@ -126,6 +132,7 @@ static struct nh_hook NickelReadingStatsHook[] = {
         .lib     = "libnickel.so.1.0.0",
         .out     = nh_symoutptr(Device__supportsActivityInMore),
         .desc    = "Show the Activity entry in the More menu on Tolino devices",
+        .optional = true,
     },
     {
         .sym     = "_ZNK11ReadingView20supportsReadingStatsEv",
@@ -133,6 +140,7 @@ static struct nh_hook NickelReadingStatsHook[] = {
         .lib     = "libnickel.so.1.0.0",
         .out     = nh_symoutptr(ReadingView__supportsReadingStats),
         .desc    = "Allow reading stats for sideloaded (non-kepub) epubs",
+        .optional = true,
     },
     {
         .sym     = "_ZN11ReadingView20hasValidReadingStatsEv",
@@ -140,6 +148,7 @@ static struct nh_hook NickelReadingStatsHook[] = {
         .lib     = "libnickel.so.1.0.0",
         .out     = nh_symoutptr(ReadingView__hasValidReadingStats),
         .desc    = "Drop the Tolino-only TOC/spine validation for reading stats",
+        .optional = true,
     },
     {
         .sym     = "_ZN11ReadingView16updateWordCountsEv",
@@ -147,6 +156,7 @@ static struct nh_hook NickelReadingStatsHook[] = {
         .lib     = "libnickel.so.1.0.0",
         .out     = nh_symoutptr(ReadingView__updateWordCounts),
         .desc    = "Compute word counts for plain epubs (chapter bars / time estimates)",
+        .optional = true,
     },
     {
         .sym     = "_ZN11ReadingView22mergedTOCAndSpineIndexEv",
@@ -154,6 +164,7 @@ static struct nh_hook NickelReadingStatsHook[] = {
         .lib     = "libnickel.so.1.0.0",
         .out     = nh_symoutptr(ReadingView__mergedTOCAndSpineIndex),
         .desc    = "Fall back to the spine index for plain epubs so read chapters are highlighted",
+        .optional = true,
     },
     {
         .sym     = "_ZN15FeatureSettings24bookSpecificStatsEnabledEv",
@@ -161,6 +172,7 @@ static struct nh_hook NickelReadingStatsHook[] = {
         .lib     = "libnickel.so.1.0.0",
         .out     = nh_symoutptr(FeatureSettings__bookSpecificStatsEnabled),
         .desc    = "Force per-book reading stats on",
+        .optional = true,
     },
     {
         .sym     = "_ZN11EventEngine19startReadingSessionER6VolumeRK11PluginState4QMapI7QString8QVariantE",
@@ -168,6 +180,7 @@ static struct nh_hook NickelReadingStatsHook[] = {
         .lib     = "libnickel.so.1.0.0",
         .out     = nh_symoutptr(EventEngine__startReadingSession),
         .desc    = "Run the Kobo session-start path on Tolino devices",
+        .optional = true,
     },
     {
         .sym     = "_ZN11EventEngine17endReadingSessionER6VolumeRK11PluginState4QMapI7QString8QVariantE",
@@ -175,6 +188,7 @@ static struct nh_hook NickelReadingStatsHook[] = {
         .lib     = "libnickel.so.1.0.0",
         .out     = nh_symoutptr(EventEngine__endReadingSession),
         .desc    = "Run the Kobo session-end path on Tolino devices",
+        .optional = true,
     },
     {
         .sym     = "_ZN11EventEngine9fireEventEPKcRK6VolumeRK4QMapI7QString8QVariantE",
@@ -182,6 +196,7 @@ static struct nh_hook NickelReadingStatsHook[] = {
         .lib     = "libnickel.so.1.0.0",
         .out     = nh_symoutptr(EventEngine__fireEvent),
         .desc    = "Run the Kobo page-turn event entry on Tolino devices",
+        .optional = true,
     },
     {
         .sym     = "_ZN11EventEngine13fireEventSlotE10QByteArray6Volume4QMapI7QString8QVariantE",
@@ -189,6 +204,7 @@ static struct nh_hook NickelReadingStatsHook[] = {
         .lib     = "libnickel.so.1.0.0",
         .out     = nh_symoutptr(EventEngine__fireEventSlot),
         .desc    = "Run the Kobo event dispatch (page turns) on Tolino devices",
+        .optional = true,
     },
     {0},
 };
@@ -198,42 +214,49 @@ static struct nh_dlsym NickelReadingStatsDlsym[] = {
         .name = "_ZNK11ReadingView13isFixedLayoutEv",
         .out  = nh_symoutptr(ReadingView__isFixedLayout),
         .desc = "Keep fixed-layout content excluded from stats",
+        .optional = true,
     },
     {
         .name = "_ZNK6Device14getDeviceClassEv",
         .out  = nh_symoutptr(Device__getDeviceClass),
         .desc = "Preserve the device-class check for the Activity entry",
+        .optional = true,
     },
     {
         .name = "_ZNK6Device24isParentalControlEnabledEv",
         .out  = nh_symoutptr(Device__isParentalControlEnabled),
         .desc = "Preserve the parental-control check for the Activity entry",
+        .optional = true,
     },
     {
         .name = "_ZNK7Content11getMimeTypeEv",
         .out  = nh_symoutptr(Content__getMimeType),
         .desc = "Detect plain epubs for the word-count retrofit",
+        .optional = true,
     },
     {
         .name = "_ZNK7Content5getIdERK7QString",
         .out  = nh_symoutptr(Content__getId),
         .desc = "Resolve the epub file path for the word-count retrofit",
+        .optional = true,
     },
     {
         .name = "_ZN11ReadingView13gotWordCountsERK5QListIiE",
         .out  = nh_symoutptr(ReadingView__gotWordCounts),
         .desc = "Deliver the computed word counts to the reading view",
+        .optional = true,
     },
     {
-        .name     = "_ZNK7Content16getAccessibilityEv",
-        .out      = nh_symoutptr(Content__getAccessibility),
-        .desc     = "Apply the original accessibility check to plain epubs",
-        .optional = true,  // missing -> plain epubs get no stats (fail closed)
+        .name = "_ZNK7Content16getAccessibilityEv",
+        .out  = nh_symoutptr(Content__getAccessibility),
+        .desc = "Apply the original accessibility check to plain epubs",
+        .optional = true,
     },
     {
         .name = "_ZN11ReadingView12chapterIndexEv",
         .out  = nh_symoutptr(ReadingView__chapterIndex),
         .desc = "Raw spine chapter index (fallback for the merged TOC/spine index on epubs)",
+        .optional = true,
     },
     {0},
 };
