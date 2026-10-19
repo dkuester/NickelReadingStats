@@ -158,6 +158,10 @@ Drei Ebenen, von günstig zu gründlich:
            --defsyms <defsyms.txt> \
            --firmware <libnickel.so.1.0.0>
 
+   `defsyms.txt` mit `llvm-nm -D --defined-only libnickel.so.1.0.0` erzeugen
+   (Adressen werden über die ELF-Ladesegmente umgerechnet; eine reine
+   Namensliste geht auch, prüft dann aber nur die Existenz und meldet
+   `PARTIAL`).
    `defsyms.txt` und `libnickel.so.1.0.0` stammen aus der Tolino-Firmware
    (proprietär) und liegen bewusst nicht im Repo — den lokalen Pfad angeben.
 

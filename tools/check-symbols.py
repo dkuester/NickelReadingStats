@@ -26,10 +26,15 @@ Usage:
 """
 
 import argparse
+import os
 import re
+import struct
 import sys
 
 from capstone import Cs, CS_ARCH_ARM, CS_MODE_THUMB
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from nhsyms import extract_symbols  # noqa: E402
 
 # Expected return convention per dlsym symbol (verified by disassembly).
 #   "pointer" -> returns T&/T* (r0 = this, returns a pointer to a field)
@@ -47,28 +52,54 @@ EXPECTED = {
 }
 
 
-def extract_symbols(source_path):
-    """Return (hooks, dlsyms) — lists of mangled names from the source."""
-    text = open(source_path, encoding="utf-8").read()
-    hooks = re.findall(r'\.sym\s*=\s*"([^"]+)"', text)
-    # `.name` is also used for the mod identifier ("NickelReadingStats");
-    # only mangled (_Z...) names are dlsym targets.
-    dlsyms = [n for n in re.findall(r'\.name\s*=\s*"([^"]+)"', text)
-              if n.startswith("_Z")]
-    return hooks, dlsyms
-
-
 def parse_defsyms(path):
-    """Return {mangled_name: address} from defsyms.txt."""
+    """Return {mangled_name: address or None} from a symbol list.
+
+    Accepts `nm`/`llvm-nm -D --defined-only` output ("addr type name") and a
+    bare list of names (one per line, no addresses: existence check only).
+    The Thumb bit is cleared, so odd st_values from other tools also work.
+    """
     out = {}
     for line in open(path, encoding="utf-8", errors="replace"):
         p = line.split()
         if len(p) >= 3:
-            out[p[2]] = int(p[0], 16)
+            out[p[2]] = int(p[0], 16) & ~1
+        elif len(p) == 1 and p[0].startswith("_Z"):
+            out[p[0]] = None
     return out
 
 
-def classify(data, addr, next_addr):
+class Firmware:
+    """The firmware bytes plus a VMA -> file offset map from its PT_LOAD
+    segments. Symbol addresses are VMAs; they equal file offsets only in a
+    segment whose p_vaddr == p_offset, which is not guaranteed."""
+
+    def __init__(self, path):
+        self.data = open(path, "rb").read()
+        d = self.data
+        if d[:4] != b"\x7fELF" or d[4] != 1:
+            sys.exit("%s: not a 32-bit ELF file" % path)
+        end = "<" if d[5] == 1 else ">"
+        (phoff,) = struct.unpack_from(end + "I", d, 0x1C)
+        phentsize, phnum = struct.unpack_from(end + "HH", d, 0x2A)
+        self.segments = []
+        for i in range(phnum):
+            p_type, p_offset, p_vaddr, _p_paddr, p_filesz = struct.unpack_from(
+                end + "IIIII", d, phoff + i * phentsize)
+            if p_type == 1:  # PT_LOAD
+                self.segments.append((p_vaddr, p_offset, p_filesz))
+
+    def read(self, vma, length):
+        """Bytes at `vma` (clamped to its segment); empty if unmapped."""
+        vma &= ~1  # Thumb bit
+        for vaddr, offset, filesz in self.segments:
+            if vaddr <= vma < vaddr + filesz:
+                start = offset + vma - vaddr
+                return self.data[start:start + min(length, vaddr + filesz - vma)]
+        return b""
+
+
+def classify(fw, addr, next_addr):
     """Classify the return convention of the function at VMA `addr`.
 
     The function body is [addr, next_addr) — the next symbol's address bounds
@@ -81,7 +112,7 @@ def classify(data, addr, next_addr):
         i.e. no sret (scalar/void return).
     """
     md = Cs(CS_ARCH_ARM, CS_MODE_THUMB)
-    insns = list(md.disasm(data[addr:next_addr], addr))
+    insns = list(md.disasm(fw.read(addr, next_addr - addr), addr))
 
     LOAD_STORE = ("ldr", "str", "ldrd", "strd", "ldrb", "strb", "ldrh", "strh")
 
@@ -149,12 +180,12 @@ R0_WRITERS = ("mov", "movs", "mov.w", "movw", "mvn", "mvns", "ldr", "ldr.w", "ld
               "subs", "sub", "eor", "eors", "eor.w", "and", "ands", "orr", "orrs")
 
 
-def classify_return(data, addr, next_addr):
+def classify_return(fw, addr, next_addr):
     """'value' if r0 is written within the 3 instructions before a return,
     'void' if returns exist and none of them is preceded by such a write,
     'unknown' if no return was found (e.g. the body ends in a tail call)."""
     md = Cs(CS_ARCH_ARM, CS_MODE_THUMB)
-    insns = list(md.disasm(data[addr:next_addr], addr))
+    insns = list(md.disasm(fw.read(addr, next_addr - addr), addr))
     returns = [i for i, ins in enumerate(insns)
                if (ins.mnemonic.startswith("pop") and "pc" in ins.op_str)
                or (ins.mnemonic == "bx" and ins.op_str == "lr")]
@@ -167,14 +198,14 @@ def classify_return(data, addr, next_addr):
     return "void"
 
 
-def check_hook_returns(defsyms, data, addrs):
+def check_hook_returns(defsyms, fw, addrs):
     errors = 0
     for sym, want in sorted(HOOK_RETURNS.items()):
         if sym not in defsyms:
             continue  # reported by the existence check
         addr = defsyms[sym]
         next_addr = next((a for a in addrs if a > addr), addr + 0x400)
-        got = classify_return(data, addr, next_addr)
+        got = classify_return(fw, addr, next_addr)
         status = "OK" if got == want else "MISMATCH"
         if status != "OK":
             errors += 1
@@ -193,7 +224,7 @@ OFFSETS = {
 }
 
 
-def check_offsets(source_text, defsyms, data, addrs):
+def check_offsets(source_text, defsyms, fw, addrs):
     """Return the number of offset problems (printing one line per offset)."""
     md = Cs(CS_ARCH_ARM, CS_MODE_THUMB)
     errors = 0
@@ -212,7 +243,7 @@ def check_offsets(source_text, defsyms, data, addrs):
         next_addr = next((a for a in addrs if a > addr), addr + 0x120)
         got = None
         # The offset is taken from `this` near the top of the function.
-        for ins in list(md.disasm(data[addr:next_addr], addr))[:24]:
+        for ins in list(md.disasm(fw.read(addr, next_addr - addr), addr))[:24]:
             hit = re.match(pattern, ins.op_str)
             if ins.mnemonic in ("add", "add.w", "adds") and hit:
                 got = int(hit.group(1), 16)
@@ -229,27 +260,42 @@ def check_offsets(source_text, defsyms, data, addrs):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--source", required=True)
-    ap.add_argument("--defsyms", required=True)
-    ap.add_argument("--firmware", required=True)
+    ap.add_argument("--defsyms", required=True,
+                    help="llvm-nm -D --defined-only output, or a bare name list "
+                         "(existence check only)")
+    ap.add_argument("--firmware",
+                    help="libnickel.so.1.0.0; without it only existence is checked")
     args = ap.parse_args()
 
     hooks, dlsyms = extract_symbols(args.source)
     symbols = {**{h: "hook" for h in hooks}, **{d: "dlsym" for d in dlsyms}}
     defsyms = parse_defsyms(args.defsyms)
-    data = open(args.firmware, "rb").read()
-
-    # Sorted addresses so classify() can bound each function body.
-    addrs = sorted(defsyms.values())
 
     errors = 0
 
     print("=== symbol existence ===")
     for name, kind in sorted(symbols.items()):
-        if name in defsyms:
-            print("  OK   %-60s 0x%08x" % (name, defsyms[name]))
-        else:
+        if name not in defsyms:
             print("  MISS %-60s (%s)" % (name, kind))
             errors += 1
+        elif defsyms[name] is None:
+            print("  OK   %-60s (no address)" % name)
+        else:
+            print("  OK   %-60s 0x%08x" % (name, defsyms[name]))
+
+    # The disassembly checks need addresses and the binary.
+    have_addrs = all(defsyms.get(n) is not None for n in symbols if n in defsyms)
+    if not (args.firmware and have_addrs):
+        print("\nPARTIAL: existence only. For the convention, return-kind and "
+              "offset checks pass --firmware and a defsyms list with addresses "
+              "(llvm-nm -D --defined-only libnickel.so.1.0.0).")
+        print("%d hook(s), %d dlsym(s) checked, %d problem(s)." % (
+            len(hooks), len(dlsyms), errors))
+        sys.exit(1 if errors else 0)
+
+    fw = Firmware(args.firmware)
+    # Sorted addresses so each function body can be bounded by the next symbol.
+    addrs = sorted({a for a in defsyms.values() if a is not None})
 
     print("\n=== dlsym return convention ===")
     for name in sorted(dlsyms):
@@ -257,7 +303,7 @@ def main():
             continue
         addr = defsyms[name]
         next_addr = next((a for a in addrs if a > addr), addr + 0x120)
-        got = classify(data, addr, next_addr)
+        got = classify(fw, addr, next_addr)
         want = EXPECTED.get(name)
         # A dlsym without a recorded expectation is an error too: otherwise a
         # new symbol silently skips the convention check that caught the
@@ -275,11 +321,11 @@ def main():
             print("          ^ declared fn-ptr must return T&/T*, NOT T by value")
 
     print("\n=== hook return kind (void vs. value) ===")
-    errors += check_hook_returns(defsyms, data, addrs)
+    errors += check_hook_returns(defsyms, fw, addrs)
 
     print("\n=== hard-coded struct offsets ===")
     errors += check_offsets(open(args.source, encoding="utf-8").read(),
-                            defsyms, data, addrs)
+                            defsyms, fw, addrs)
 
     print("\n%d hook(s), %d dlsym(s) checked, %d problem(s)." % (
         len(hooks), len(dlsyms), errors))

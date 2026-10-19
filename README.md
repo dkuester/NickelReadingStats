@@ -150,6 +150,9 @@ Three levels, from cheap to thorough:
            --defsyms <defsyms.txt> \
            --firmware <libnickel.so.1.0.0>
 
+   Generate `defsyms.txt` with `llvm-nm -D --defined-only libnickel.so.1.0.0`
+   (addresses are mapped through the ELF load segments; a bare name list
+   also works but only checks existence, reported as `PARTIAL`).
    `defsyms.txt` and `libnickel.so.1.0.0` come from the Tolino firmware
    (proprietary) and are deliberately not in the repo — pass the local path.
 

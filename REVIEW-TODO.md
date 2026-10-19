@@ -72,16 +72,16 @@ Status: `[ ]` offen · `[~]` in Arbeit · `[x]` erledigt · `[!]` blockiert (Gru
   `libnickel` (BuildID bcfe1a2b…) geprüft: 19/19 Symbole, 7/7 Konventionen OK.*
 - [x] **K5** Tote Fallbacks (`!Device__isTolino` → `true`, `mergedTOC` → `0`)
   aufräumen oder kommentieren.
-- [ ] **K6** `extract()` aus beiden Python-Tools in ein gemeinsames Modul.
+- [x] **K6** `extract()` aus beiden Python-Tools in ein gemeinsames Modul.
 
 ## Repo, CI, Tools
 
 - [x] **R1** `tools/__pycache__/*.pyc` aus Git entfernen und ignorieren.
 - [ ] **R2** CI-Job mit Qt6 zusätzlich zu Qt5.
-- [ ] **R3** `check-symbols.py`: VMA ≠ Datei-Offset und Thumb-Bit prüfen
-  *(für Tolino 5.18 unkritisch: `llvm-nm` liefert gerade Adressen, alle
-  Klassifikationen stimmen; für andere Binaries absichern)*;
+- [x] **R3** `check-symbols.py`: VMA ≠ Datei-Offset und Thumb-Bit prüfen;
   `defsyms.txt` mit nur einer Spalte (reine Namensliste) unterstützen.
+  *Umgesetzt über PT_LOAD-Segmente. Im 5.18-Binary weicht das Datensegment
+  um 0x10000 ab (relevant für Typinfo-Prüfungen wie N3).*
 - [x] **R4** Fixture erweitern: `mimetype`, `<title>`, Unterordner,
   prozent-kodierter Href, fehlende Spine-Datei. *Generator:
   `hook/tests/fixtures/make_sample_epub.py`.*
@@ -156,3 +156,4 @@ Aufgaben:
 - 2026-10-19: Suche nach Clara-BW-5.x-Firmware: öffentlich nicht verfügbar (KC3 bleibt blockiert).
 - 2026-10-19: K1, K2, K5 erledigt (Kopfkommentar, „5.18+“ einheitlich, Fallbacks dokumentiert).
 - 2026-10-19: M8 erledigt (Rückgabetypen korrigiert, HOOK_RETURNS-Check).
+- 2026-10-19: K6, R3 erledigt (tools/nhsyms.py, ELF-Segment-Mapping, Thumb-Bit, Namenslisten).
