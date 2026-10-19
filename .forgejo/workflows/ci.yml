@@ -8,10 +8,13 @@ jobs:
     # test_wordcount exercises wordcount_logic.h (the same pure logic the hook
     # compiles against Qt6); test_epub_words runs the real count_epub_words()
     # (incl. QZipReader) against a fixture EPUB, so it also needs QtGui's
-    # private headers (qtbase5-private-dev).
+    # private headers (qtbase5-private-dev); test_hook_async drives the
+    # background counting in readingstats.cc with fake libnickel pointers.
     runs-on: codeberg-tiny
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: true  # test_hook_async includes NickelHook/NickelHook.h
       - name: Install Qt5 (incl. private headers)
         run: apt-get update && apt-get install -y --no-install-recommends qtbase5-dev qtbase5-private-dev
       - name: Build and run word-count unit tests

@@ -17,3 +17,4 @@ hook/tests/test_epub_words
 # Python bytecode
 __pycache__/
 *.pyc
+hook/tests/test_hook_async

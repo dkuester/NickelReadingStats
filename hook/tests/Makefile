@@ -43,11 +43,22 @@ test_epub_words: test_epub_words.cpp ../src/wordcount.cc ../src/wordcount.h \
 	$(CXX) $(CXXFLAGS) $(EPUB_CPPFLAGS) test_epub_words.cpp ../src/wordcount.cc \
 	    -o $@ $(EPUB_LDLIBS)
 
-check: test_wordcount test_epub_words
+# --- hook test: background counting, cache, view lifetime ------------------
+# Includes ../src/readingstats.cc directly (fake libnickel function pointers);
+# same QtGui private-header requirement as test_epub_words. C++20 for the
+# designated initializers in the hook tables.
+test_hook_async: test_hook_async.cpp ../src/readingstats.cc ../src/wordcount.cc \
+                 ../src/wordcount.h ../src/wordcount_logic.h fixtures/sample.epub
+	$(CXX) $(CXXFLAGS) -std=c++20 -Wno-missing-field-initializers \
+	    $(EPUB_CPPFLAGS) -I../NickelHook test_hook_async.cpp ../src/wordcount.cc \
+	    -o $@ $(EPUB_LDLIBS)
+
+check: test_wordcount test_epub_words test_hook_async
 	./test_wordcount
 	./test_epub_words fixtures/sample.epub
+	./test_hook_async fixtures/sample.epub
 
 clean:
-	rm -f test_wordcount test_epub_words
+	rm -f test_wordcount test_epub_words test_hook_async
 
 .PHONY: check clean

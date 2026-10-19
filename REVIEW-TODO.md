@@ -35,8 +35,11 @@ Status: `[ ]` offen · `[~]` in Arbeit · `[x]` erledigt · `[!]` blockiert (Gru
   des Originals (per Disassembly ermittelt): plain epub statt kepub,
   `getAccessibility() != 6`, `!isFixedLayout()`. Die virtuelle Prüfung an
   vtable+0x10c ist nicht nachgebildet (unbekannt) → N2.*
-- [ ] **M6** Wortzählung blockiert den UI-Thread: Cache (Pfad + mtime +
-  Größe) und/oder Hintergrund-Thread.
+- [x] **M6** Wortzählung blockiert den UI-Thread: Cache (Pfad + mtime +
+  Größe) und/oder Hintergrund-Thread. *Umgesetzt: eigener Pool mit 1 Thread,
+  Auslieferung per Queued-Call auf den GUI-Thread mit `QPointer`- und
+  `getId`-Prüfung, Cache (16 Bücher), Warteliste für parallele Öffnungen.
+  Host-Test `test_hook_async`.*
 - [x] **M7** Entpacken begrenzen: Einträge über einem Limit (z. B. 16 MB)
   überspringen bzw. mit `0` zählen. *Umgesetzt mit 8 MB pro Eintrag
   (`kMaxEpubEntryBytes`), geprüft gegen die unkomprimierte Größe im
@@ -123,6 +126,11 @@ Aufgaben:
 - [ ] **N2** Virtuelle Methode an vtable+0x10c in `supportsReadingStats`
   identifizieren (vtable von `ReadingView` auflösen) und ggf. nachbilden.
 
+- [ ] **N3** `ReadingView` → `QObject*`-Cast (M6) setzt voraus, dass `QWidget`
+  die primäre Basis bei Offset 0 ist (5.18-Typinfo: base[0] = `QWidget`,
+  offset 0). In `check-symbols.py` gegen die Typinfo prüfen (Relocations von
+  `_ZTI11ReadingView`), vor allem für Kobo-Firmware (KC3).
+
 ## Log
 
 - 2026-10-19: Datei angelegt, Branch `review/code-review-fixes` erstellt.
@@ -136,3 +144,4 @@ Aufgaben:
 - 2026-10-19: KC1, KC2 (alle Hooks/dlsyms optional), K3 (README-Limits neu) erledigt.
 - 2026-10-19: W1–W4 und R4 erledigt (count_words neu, 44 Host-Checks).
 - 2026-10-19: M7 erledigt (BoundedZip, 8 MB/Eintrag, Tests mit Limit).
+- 2026-10-19: M6 erledigt (Hintergrund-Thread, Cache, Host-Test); N3 aufgenommen.

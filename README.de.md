@@ -88,6 +88,13 @@ laufen unverändert) und zählt danach für ein sideloaded EPUB die Wörter selb
    Wörter zählen.
 5. Die `QList<int>` über `ReadingView::gotWordCounts()` an Nickel liefern.
 
+Schritte 3–4 laufen in einem einzelnen Hintergrund-Thread, wie Nickels eigener
+kepub-Wortzähler; das Öffnen eines Buchs blockiert die Oberfläche also nicht.
+Das Ergebnis wird im GUI-Thread ausgeliefert, und nur, wenn der View noch
+existiert und noch dasselbe Buch zeigt. Ergebnisse werden pro Datei gecacht
+(ungültig bei geänderter Größe oder mtime), und jeder ZIP-Eintrag ist auf 8 MB
+unkomprimiert begrenzt.
+
 Damit füllt sich auch bei normalen EPUBs das Kapitel-Balkendiagramm und die
 zeitbasierten Schätzungen werden plausibel. Randnotiz: Bücher, die aus einer
 einzigen großen HTML-Datei bestehen, ergeben genau einen Balken — das ist
@@ -115,7 +122,7 @@ Voraussetzung: Docker-Image `strayrose/nickeltc:latest`
 
 Drei Ebenen, von günstig zu gründlich:
 
-1. **Host-Unit-Tests** (`hook/tests/`) — zwei Binaries, beide gegen das
+1. **Host-Unit-Tests** (`hook/tests/`) — drei Binaries, alle gegen das
    Host-Qt:
 
    - `test_wordcount` prüft die pure Logik (Tokenisierung, Script-/Style-
@@ -125,8 +132,13 @@ Drei Ebenen, von günstig zu gründlich:
      QZipReader — gegen ein Fixture-EPUB (`fixtures/sample.epub`) aus und
      prüft die exakten Wortzahlen pro Kapitel. Braucht QtGuis privaten
      `qzipreader_p.h` und baut nur, wo diese privaten Header installiert sind.
+   - `test_hook_async` bindet `readingstats.cc` mit gefälschten
+     libnickel-Funktionszeigern ein und prüft die Wortzählung im Hintergrund:
+     Auslieferung, Cache und dass ein zwischenzeitlich geschlossener oder für
+     ein anderes Buch wiederverwendeter View nichts bekommt. Gleiche
+     Voraussetzung (private Header).
 
-   Beide laufen mit:
+   Alle laufen mit:
 
        make -C hook/tests check
 

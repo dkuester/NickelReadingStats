@@ -40,8 +40,15 @@
 #include <NickelHook.h>
 
 #include <QByteArray>
+#include <QDateTime>
+#include <QFileInfo>
+#include <QHash>
 #include <QList>
+#include <QMetaObject>
+#include <QObject>
+#include <QPointer>
 #include <QString>
+#include <QThreadPool>
 
 #include "wordcount.h"
 
@@ -427,11 +434,80 @@ _nh_ReadingView__mergedTOCAndSpineIndex(ReadingView *view) {
     return ReadingView__mergedTOCAndSpineIndex(view);
 }
 
+// --- Background word counting -------------------------------------------
+//
+// Counting a whole epub can take seconds on the device, so it runs on a
+// worker thread and the result is delivered back on the GUI thread, like
+// Nickel's own KepubBookWordCounter does for kepubs. Everything below except
+// the worker lambda runs on the GUI thread only.
+
+// A view waiting for the counts of a book.
+struct WordCountWaiter {
+    // ReadingView's primary base is QWidget (offset 0 in the 5.18 typeinfo),
+    // so the view pointer is its QObject; QPointer notices if it is destroyed.
+    QPointer<QObject> guard;
+    ReadingView *view;
+    QString id;  // content ID at request time, to detect a reused view
+};
+
+// Counts of recently opened epubs by path, invalidated when the file's size
+// or mtime changes. Failed counts (empty) are cached too, so a broken epub is
+// not re-parsed on every open.
+struct CachedWordCounts {
+    qint64 size;
+    QDateTime mtime;
+    QList<int> counts;
+};
+static constexpr int kWordCountCacheSize = 16;
+static QHash<QString, CachedWordCounts> g_word_count_cache;
+static QHash<QString, QList<WordCountWaiter>> g_word_count_waiters;  // in flight
+
+// One worker thread: books are counted one at a time (bounded memory), and
+// Nickel's global thread pool is left alone. Never deleted, so a count still
+// running at shutdown cannot block or crash Nickel's exit.
+static QThreadPool *word_count_pool() {
+    static QThreadPool *pool = [] {
+        auto *p = new QThreadPool;
+        p->setMaxThreadCount(1);
+        return p;
+    }();
+    return pool;
+}
+
+// Lives on the GUI thread and is never deleted, so a worker can always post
+// its result here.
+static QObject *word_count_receiver() {
+    static QObject *receiver = new QObject;
+    return receiver;
+}
+
+static void deliver_word_counts(const WordCountWaiter &w, const QList<int> &counts) {
+    // The view may have been closed, or reused for another book, meanwhile.
+    if (counts.isEmpty() || !w.guard || !is_plain_epub(w.view) ||
+        Content__getId(reading_view_content(w.view), QString()) != w.id) {
+        return;
+    }
+    ReadingView__gotWordCounts(w.view, counts);
+}
+
+static void word_counts_done(const QString &path, qint64 size, const QDateTime &mtime,
+                             const QList<int> &counts) {
+    if (g_word_count_cache.size() >= kWordCountCacheSize) {
+        g_word_count_cache.clear();
+    }
+    g_word_count_cache.insert(path, CachedWordCounts{size, mtime, counts});
+    const QList<WordCountWaiter> waiters = g_word_count_waiters.take(path);
+    for (const WordCountWaiter &w : waiters) {
+        deliver_word_counts(w, counts);
+    }
+}
+
 // ReadingView::updateWordCounts() is the kepub-only gate that computes the
 // per-chapter word counts behind the chapter bars and time estimates. It
 // early-returns for anything that is not a kepub. We run the original (kepub
 // and instapaper are handled there) and then, for a sideloaded plain epub,
-// count the words ourselves and deliver them through gotWordCounts().
+// count the words ourselves (cached, in the background) and deliver them
+// through gotWordCounts().
 extern "C" __attribute__((visibility("default"))) void
 _nh_ReadingView__updateWordCounts(ReadingView *view) {
     if (ReadingView__updateWordCounts) {
@@ -453,11 +529,35 @@ _nh_ReadingView__updateWordCounts(ReadingView *view) {
     if (!id.startsWith(QLatin1String("file://"))) {
         return;  // not a sideloaded file (store content uses the kepub path)
     }
+    const QString path = id.mid(7);  // strip "file://"
 
-    const QList<int> counts = count_epub_words(id.mid(7));  // strip "file://"
-    if (!counts.isEmpty()) {
-        ReadingView__gotWordCounts(view, counts);
+    const WordCountWaiter waiter{QPointer<QObject>(reinterpret_cast<QObject *>(view)), view, id};
+
+    const QFileInfo info(path);
+    const qint64 size = info.size();
+    const QDateTime mtime = info.lastModified();
+    const auto cached = g_word_count_cache.constFind(path);
+    if (cached != g_word_count_cache.constEnd() && cached->size == size && cached->mtime == mtime) {
+        deliver_word_counts(waiter, cached->counts);
+        return;
     }
+
+    // Already being counted (e.g. reopened quickly): just wait for it.
+    const auto pending = g_word_count_waiters.find(path);
+    if (pending != g_word_count_waiters.end()) {
+        pending->append(waiter);
+        return;
+    }
+    g_word_count_waiters.insert(path, QList<WordCountWaiter>{waiter});
+
+    // The worker only touches its own copies of value types.
+    QObject *receiver = word_count_receiver();
+    word_count_pool()->start([receiver, path, size, mtime]() {
+        const QList<int> counts = count_epub_words(path);
+        QMetaObject::invokeMethod(
+            receiver, [path, size, mtime, counts]() { word_counts_done(path, size, mtime, counts); },
+            Qt::QueuedConnection);
+    });
 }
 
 extern "C" __attribute__((visibility("default"))) bool
