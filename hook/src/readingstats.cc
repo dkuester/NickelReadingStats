@@ -88,6 +88,7 @@ static QString    (*Content__getId)(const Content *, const QString &);
 static void       (*ReadingView__gotWordCounts)(ReadingView *, const QList<int> &);
 static int        (*ReadingView__chapterIndex)(ReadingView *);
 static int        (*Content__getAccessibility)(const Content *);
+static bool       (*ReadingView__hasOnlyImages)(ReadingView *);
 
 // Offset of the Volume/Content embedded in ReadingView. Firmware-specific:
 // ReadingView::updateWordCounts() computes it itself (`add.w rX, r0, #0x94`
@@ -267,6 +268,12 @@ static struct nh_dlsym NickelReadingStatsDlsym[] = {
         .optional = true,
     },
     {
+        .name = "_ZNK11ReadingView13hasOnlyImagesEv",
+        .out  = nh_symoutptr(ReadingView__hasOnlyImages),
+        .desc = "Apply the original image-only check to plain epubs",
+        .optional = true,
+    },
+    {
         .name = "_ZN11ReadingView12chapterIndexEv",
         .out  = nh_symoutptr(ReadingView__chapterIndex),
         .desc = "Raw spine chapter index (fallback for the merged TOC/spine index on epubs)",
@@ -289,11 +296,13 @@ static bool is_plain_epub(ReadingView *view) {
 
 // The original ReadingView::supportsReadingStats() (5.18) is
 //     mime == kepub && content.getAccessibility() != 6
-//         && !<virtual at vtable+0x10c>() && !isFixedLayout()
-// This mirrors it for plain epubs: the kepub check becomes a plain-epub
-// check, the other guards stay. A kepub the original rejected stays
-// rejected. Anything that cannot be evaluated counts as unsupported (fail
-// closed). The virtual check is not replicated (unidentified).
+//         && !hasOnlyImages() && !isFixedLayout()
+// (hasOnlyImages() is the virtual call through vtable slot 0x10c; no class
+// derives from ReadingView, so calling it directly is equivalent). This
+// mirrors it for plain epubs: the kepub check becomes a plain-epub check,
+// the other guards stay. A kepub the original rejected stays rejected.
+// Anything that cannot be evaluated counts as unsupported (fail closed).
+// tools/check-symbols.py verifies the virtual call still resolves there.
 static constexpr int kAccessibilityNoStats = 6;  // state the original rejects
 
 static bool reading_stats_supported(ReadingView *view) {
@@ -302,6 +311,9 @@ static bool reading_stats_supported(ReadingView *view) {
     }
     if (!ReadingView__isFixedLayout || ReadingView__isFixedLayout(view)) {
         return false;
+    }
+    if (!ReadingView__hasOnlyImages || ReadingView__hasOnlyImages(view)) {
+        return false;  // picture books / comics packaged as epub
     }
     if (!Content__getAccessibility ||
         Content__getAccessibility(reading_view_content(view)) == kAccessibilityNoStats) {

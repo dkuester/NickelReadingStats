@@ -63,8 +63,8 @@ parental-control guards remain.
 Which books get stats: the hooks call the original function first and keep a
 `true`. Otherwise they apply the original `supportsReadingStats()` rule with
 only its kepub requirement replaced by "plain EPUB" (`application/epub+zip`):
-the content's accessibility state must not be 6 and the book must not be
-fixed-layout. Fixed-layout content (fixed-layout EPUBs, PDF, comics) and other
+the content's accessibility state must not be 6, the book must not consist of
+images only (`hasOnlyImages()`), and it must not be fixed-layout. Fixed-layout content (fixed-layout EPUBs, PDF, comics) and other
 formats stay excluded, and a kepub that Nickel rejects stays rejected.
 
 ## Word counting for regular EPUBs
@@ -142,7 +142,11 @@ Three levels, from cheap to thorough:
    the book-open crash: `Content::getMimeType()` returns `QByteArray&`, not
    `QByteArray` by value. It also checks the hard-coded `ReadingView` →
    `Content` offset (`kReadingViewContentOffset`, 0x94 on 5.18) against the
-   instruction in `ReadingView::updateWordCounts()` that computes it. Needs the
+   instruction in `ReadingView::updateWordCounts()` that computes it, that
+   `ReadingView`'s first base is still `QWidget` at offset 0 (the hook uses
+   the view as a `QObject`), and that the virtual call in the original
+   `supportsReadingStats()` still resolves to `hasOnlyImages()` — via the
+   typeinfo/vtable relocations. Needs the
    proprietary firmware files:
 
        python3 tools/check-symbols.py \

@@ -66,8 +66,8 @@ Welche Bücher Stats bekommen: Die Hooks rufen zuerst die Originalfunktion
 auf und übernehmen ein `true`. Andernfalls wenden sie die Regel des
 Originals `supportsReadingStats()` an, bei der nur die kepub-Bedingung durch
 „normales EPUB“ (`application/epub+zip`) ersetzt ist: Der
-Accessibility-Status des Inhalts darf nicht 6 sein, und das Buch darf kein
-Fixed-Layout sein. Fixed-Layout-Inhalte (Fixed-Layout-EPUBs, PDF, Comics) und
+Accessibility-Status des Inhalts darf nicht 6 sein, das Buch darf nicht nur
+aus Bildern bestehen (`hasOnlyImages()`) und kein Fixed-Layout sein. Fixed-Layout-Inhalte (Fixed-Layout-EPUBs, PDF, Comics) und
 andere Formate bleiben ausgeschlossen; ein kepub, das Nickel ablehnt, bleibt
 abgelehnt.
 
@@ -150,7 +150,11 @@ Drei Ebenen, von günstig zu gründlich:
    zurück, nicht `QByteArray` per Wert. Außerdem prüft er den fest
    eingetragenen Offset `ReadingView` → `Content`
    (`kReadingViewContentOffset`, 0x94 auf 5.18) gegen die Instruktion in
-   `ReadingView::updateWordCounts()`, die ihn berechnet. Braucht die
+   `ReadingView::updateWordCounts()`, die ihn berechnet, dass `QWidget` noch
+   die erste Basisklasse von `ReadingView` bei Offset 0 ist (der Hook nutzt
+   den View als `QObject`) und dass der virtuelle Aufruf im Original
+   `supportsReadingStats()` noch auf `hasOnlyImages()` zeigt — über die
+   Typinfo-/vtable-Relocations. Braucht die
    proprietären Firmware-Dateien:
 
        python3 tools/check-symbols.py \

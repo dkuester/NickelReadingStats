@@ -133,13 +133,15 @@ Aufgaben:
   `mergedTOC`-Fallback könnte das Original für plain epubs selbst `true`
   liefern; auf dem Gerät prüfen, ob der Override noch nötig ist bzw. die
   Bereichsprüfung nachbilden (Absturzrisiko bei Index ≥ Größe).
-- [ ] **N2** Virtuelle Methode an vtable+0x10c in `supportsReadingStats`
+- [x] **N2** Virtuelle Methode an vtable+0x10c in `supportsReadingStats`
   identifizieren (vtable von `ReadingView` auflösen) und ggf. nachbilden.
-
-- [ ] **N3** `ReadingView` → `QObject*`-Cast (M6) setzt voraus, dass `QWidget`
-  die primäre Basis bei Offset 0 ist (5.18-Typinfo: base[0] = `QWidget`,
-  offset 0). In `check-symbols.py` gegen die Typinfo prüfen (Relocations von
-  `_ZTI11ReadingView`), vor allem für Kobo-Firmware (KC3).
+  *Ist `ReadingView::hasOnlyImages()`. Keine Unterklasse überschreibt sie →
+  direkter Aufruf per dlsym; Original damit vollständig nachgebildet.
+  `check-symbols.py` (VIRTUAL_CALLS) prüft die Auflösung.*
+- [x] **N3** `ReadingView` → `QObject*`-Cast (M6) setzt voraus, dass `QWidget`
+  die primäre Basis bei Offset 0 ist. *`check-symbols.py` (PRIMARY_BASES)
+  liest die Typinfo über die ELF-Relocations: 5.18 OK (13 Basen, base[0] =
+  `QWidget`, Offset 0, public).*
 
 ## Log
 
@@ -161,3 +163,5 @@ Aufgaben:
 - 2026-10-19: K6, R3 erledigt (tools/nhsyms.py, ELF-Segment-Mapping, Thumb-Bit, Namenslisten).
 - 2026-10-19: W5 erledigt (55 Host-Checks).
 - 2026-10-19: R2 erledigt (Job wordcount-qt6; beide Jobs installieren make/g++/pkg-config explizit).
+- 2026-10-19: Branch nach Codeberg gepusht (Sicherung, kein PR).
+- 2026-10-19: N2, N3 erledigt (hasOnlyImages nachgebildet; Typinfo-/vtable-Checks).

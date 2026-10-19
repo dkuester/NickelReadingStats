@@ -6,7 +6,7 @@ exported-symbol list (defsyms.txt), both extracted from the target 5.18+
 firmware image (Tolino or Kobo).
 Neither file is committed (proprietary); keep them in a local scratch dir.
 
-Four checks:
+Five checks:
 1. Every `.sym` (hook) and `.name` (dlsym) mangled name in the source must
    exist in defsyms.txt. Catches typos and symbols that aren't in the firmware.
 2. Every dlsym symbol is disassembled and its return convention is classified
@@ -15,7 +15,10 @@ Four checks:
    declared `QByteArray` by value, but the symbol returns `QByteArray&`).
 3. Hooked functions whose return value the hook forwards (HOOK_RETURNS)
    return void/value as declared.
-4. Every hard-coded struct offset in the source (OFFSETS) matches the
+4. Class layouts the hook relies on (PRIMARY_BASES: ReadingView* used as
+   QObject*) and the virtual calls of originals it mirrors (VIRTUAL_CALLS),
+   resolved through typeinfo/vtable relocations.
+5. Every hard-coded struct offset in the source (OFFSETS) matches the
    instruction that computes it in the firmware.
 
 Usage:
@@ -49,6 +52,7 @@ EXPECTED = {
     "_ZN11ReadingView13gotWordCountsERK5QListIiE": "simple",
     "_ZN11ReadingView12chapterIndexEv": "simple",
     "_ZNK7Content16getAccessibilityEv": "simple",
+    "_ZNK11ReadingView13hasOnlyImagesEv": "simple",
 }
 
 
@@ -82,12 +86,66 @@ class Firmware:
         end = "<" if d[5] == 1 else ">"
         (phoff,) = struct.unpack_from(end + "I", d, 0x1C)
         phentsize, phnum = struct.unpack_from(end + "HH", d, 0x2A)
+        self.end = end
         self.segments = []
         for i in range(phnum):
             p_type, p_offset, p_vaddr, _p_paddr, p_filesz = struct.unpack_from(
                 end + "IIIII", d, phoff + i * phentsize)
             if p_type == 1:  # PT_LOAD
                 self.segments.append((p_vaddr, p_offset, p_filesz))
+        self._relocs = None
+
+    def word(self, vma):
+        """The 32-bit word stored at `vma` (before relocation)."""
+        raw = self.read(vma, 4)
+        return struct.unpack(self.end + "I", raw)[0] if len(raw) == 4 else None
+
+    def relocations(self):
+        """{vma: (type, symbol name or None)} from every SHT_REL section.
+        Pointers in typeinfo/vtables are relocated at load time, so this is
+        how a slot is resolved to the symbol it points at."""
+        if self._relocs is not None:
+            return self._relocs
+        d, end = self.data, self.end
+        (shoff,) = struct.unpack_from(end + "I", d, 0x20)
+        shentsize, shnum = struct.unpack_from(end + "HH", d, 0x2E)
+        sections = [struct.unpack_from(end + "IIIIIIIIII", d, shoff + i * shentsize)
+                    for i in range(shnum)]
+        # (name, type, flags, addr, offset, size, link, info, align, entsize)
+        relocs = {}
+        for sh in sections:
+            if sh[1] != 9:  # SHT_REL
+                continue
+            symtab = sections[sh[6]]
+            strtab = sections[symtab[6]]
+
+            def symname(index):
+                if index == 0:
+                    return None
+                st_name = struct.unpack_from(end + "I", d, symtab[4] + index * 16)[0]
+                stop = d.index(b"\0", strtab[4] + st_name)
+                return d[strtab[4] + st_name:stop].decode("ascii", "replace")
+
+            for off in range(sh[4], sh[4] + sh[5], 8):
+                r_offset, r_info = struct.unpack_from(end + "II", d, off)
+                relocs[r_offset] = (r_info & 0xFF, symname(r_info >> 8))
+        self._relocs = relocs
+        return relocs
+
+    def pointer(self, vma, by_address):
+        """Resolve the pointer stored at `vma` to a symbol name: via its
+        R_ARM_ABS32/GLOB_DAT symbol, or for R_ARM_RELATIVE via the stored
+        address and `by_address` ({address: name}). None if unknown."""
+        rel = self.relocations().get(vma)
+        if rel is None:
+            return None
+        rtype, name = rel
+        if name:
+            return name
+        if rtype == 23:  # R_ARM_RELATIVE: the stored word is the address
+            target = self.word(vma)
+            return by_address.get(target & ~1) if target is not None else None
+        return None
 
     def read(self, vma, length):
         """Bytes at `vma` (clamped to its segment); empty if unmapped."""
@@ -213,6 +271,94 @@ def check_hook_returns(defsyms, fw, addrs):
     return errors
 
 
+# Class layouts the hook relies on: typeinfo -> required primary base. The
+# hook treats a ReadingView* as its QObject* (QPointer in the word-count
+# delivery), which holds only while QWidget is base[0] at offset 0.
+PRIMARY_BASES = {
+    "_ZTI11ReadingView": "_ZTI7QWidget",
+}
+
+# Virtual calls inside an original function the hook mirrors, as the set of
+# methods they resolve to through the class vtable. If firmware adds, drops
+# or changes one, the mirror in the hook is out of date.
+VIRTUAL_CALLS = {
+    "_ZNK11ReadingView20supportsReadingStatsEv": (
+        "_ZTV11ReadingView", {"_ZNK11ReadingView13hasOnlyImagesEv"}),
+}
+
+
+def by_address(defsyms):
+    out = {}
+    for name, addr in sorted(defsyms.items()):
+        if addr is not None:
+            out.setdefault(addr, name)
+    return out
+
+
+def check_primary_bases(defsyms, fw):
+    errors = 0
+    names = by_address(defsyms)
+    for ti, want in sorted(PRIMARY_BASES.items()):
+        addr = defsyms.get(ti)
+        if addr is None:
+            print("  MISS     %-28s not in firmware" % ti)
+            errors += 1
+            continue
+        kind = fw.pointer(addr, names) or "?"
+        if "si_class_type_info" in kind:   # single base, offset 0 implied
+            base, offset, public = fw.pointer(addr + 8, names), 0, True
+        elif "vmi_class_type_info" in kind:
+            base = fw.pointer(addr + 16, names)          # base[0] typeinfo
+            flags = fw.word(addr + 20) or 0              # offset << 8 | flags
+            offset, public = flags >> 8, bool(flags & 2)
+        else:
+            base, offset, public = None, None, False
+        ok = base == want and offset == 0 and public
+        if not ok:
+            errors += 1
+        print("  %-8s %-28s base[0]=%s offset=%s%s" % (
+            "OK" if ok else "MISMATCH", ti, base, offset, "" if public else " (not public)"))
+    return errors
+
+
+def check_virtual_calls(defsyms, fw, addrs):
+    """Find `ldr rV, [rT]` (vptr) followed by `ldr rF, [rV, #imm]` and a
+    `blx rF` in the function, resolve each slot through the vtable, and
+    compare the set of targets with VIRTUAL_CALLS."""
+    errors = 0
+    names = by_address(defsyms)
+    md = Cs(CS_ARCH_ARM, CS_MODE_THUMB)
+    for func, (vtable, want) in sorted(VIRTUAL_CALLS.items()):
+        addr, vt = defsyms.get(func), defsyms.get(vtable)
+        if addr is None or vt is None:
+            print("  MISS     %s / %s not in firmware" % (func[:40], vtable))
+            errors += 1
+            continue
+        next_addr = next((a for a in addrs if a > addr), addr + 0x200)
+        insns = list(md.disasm(fw.read(addr, next_addr - addr), addr))
+        vptr_regs, slot_regs, got = set(), {}, set()
+        for ins in insns:
+            m = re.match(r"(r\d+|ip), \[(r\d+)\]$", ins.op_str)
+            if ins.mnemonic in ("ldr", "ldr.w") and m:
+                vptr_regs.add(m.group(1))
+                continue
+            m = re.match(r"(r\d+|ip), \[(r\d+), #(0x[0-9a-f]+|\d+)\]$", ins.op_str)
+            if ins.mnemonic in ("ldr", "ldr.w") and m and m.group(2) in vptr_regs:
+                slot_regs[m.group(1)] = int(m.group(3), 0)
+                continue
+            if ins.mnemonic == "blx" and ins.op_str in slot_regs:
+                target = fw.pointer(vt + 8 + slot_regs[ins.op_str], names)
+                got.add(target or "slot 0x%x" % slot_regs[ins.op_str])
+        ok = got == want
+        if not ok:
+            errors += 1
+        print("  %-8s %-44s calls %s" % ("OK" if ok else "MISMATCH", func[:44],
+                                         ", ".join(sorted(got)) or "nothing"))
+        if not ok:
+            print("           expected %s" % ", ".join(sorted(want)))
+    return errors
+
+
 # Struct offsets the hook hard-codes, verified against the instruction that
 # computes them inside a firmware function:
 #   source constant -> (function symbol, regex on the op_str of its add)
@@ -322,6 +468,12 @@ def main():
 
     print("\n=== hook return kind (void vs. value) ===")
     errors += check_hook_returns(defsyms, fw, addrs)
+
+    print("\n=== class layout (primary bases) ===")
+    errors += check_primary_bases(defsyms, fw)
+
+    print("\n=== virtual calls in mirrored originals ===")
+    errors += check_virtual_calls(defsyms, fw, addrs)
 
     print("\n=== hard-coded struct offsets ===")
     errors += check_offsets(open(args.source, encoding="utf-8").read(),
