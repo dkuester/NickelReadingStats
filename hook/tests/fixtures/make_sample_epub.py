@@ -6,7 +6,10 @@ Spine (expected word counts in brackets):
   c2   ch2.xhtml            [2]
   gone missing.xhtml        [0]  manifest entry without a zip file
   c3   ch3.xhtml            [3]
-  c4   Kapitel%204.xhtml    [2]  percent-encoded href -> "Kapitel 4.xhtml"
+  c4   Text/Kapitel%204.xhtml [2] subfolder + percent-encoded href
+                                 -> "OEBPS/Text/Kapitel 4.xhtml"
+
+Every chapter has a <head><title> whose words must NOT be counted.
 
 Usage: python3 make_sample_epub.py [output.epub]
 """
@@ -33,7 +36,7 @@ OPF = """<?xml version="1.0" encoding="UTF-8"?>
     <item id="c2" href="ch2.xhtml" media-type="application/xhtml+xml"/>
     <item id="gone" href="missing.xhtml" media-type="application/xhtml+xml"/>
     <item id="c3" href="ch3.xhtml" media-type="application/xhtml+xml"/>
-    <item id="c4" href="Kapitel%204.xhtml" media-type="application/xhtml+xml"/>
+    <item id="c4" href="Text/Kapitel%204.xhtml" media-type="application/xhtml+xml"/>
   </manifest>
   <spine>
     <itemref idref="c1"/>
@@ -49,6 +52,7 @@ OPF = """<?xml version="1.0" encoding="UTF-8"?>
 def xhtml(body):
     return ('<?xml version="1.0" encoding="UTF-8"?>\n'
             '<html xmlns="http://www.w3.org/1999/xhtml">\n'
+            "<head><title>Chapter Title Words</title></head>\n"
             "<body>%s</body>\n</html>\n" % body)
 
 
@@ -69,7 +73,7 @@ def main():
         add(z, "OEBPS/ch1.xhtml", xhtml("<p>alpha beta gamma delta</p>"))
         add(z, "OEBPS/ch2.xhtml", xhtml("<p>epsilon zeta</p>"))
         add(z, "OEBPS/ch3.xhtml", xhtml("<p>eta theta iota</p>"))
-        add(z, "OEBPS/Kapitel 4.xhtml", xhtml("<p>kappa lambda</p>"))
+        add(z, "OEBPS/Text/Kapitel 4.xhtml", xhtml("<p>kappa lambda</p>"))
 
 if __name__ == "__main__":
     main()

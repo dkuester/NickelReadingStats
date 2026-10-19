@@ -35,7 +35,7 @@ int main(int argc, char **argv)
         check("ch2 words", counts[1], 2);           // epsilon zeta
         check("missing file -> 0", counts[2], 0);   // keeps later indices aligned
         check("ch3 words", counts[3], 3);           // eta theta iota
-        check("percent-encoded href", counts[4], 2); // Kapitel%204.xhtml
+        check("subdir + %-encoded href", counts[4], 2); // Text/Kapitel%204.xhtml
     }
 
     const QList<int> missing =

@@ -43,6 +43,26 @@ int main()
     CHECK_EQ(count_words(QString("foo&amp;bar")), 1);
     CHECK_EQ(count_words(QString("a&rsquo;b")), 1);
     CHECK_EQ(count_words(QString("<div class=\"x\">\n<p>para one</p>\n<p>para two</p>\n</div>")), 4);
+    // only the <body> counts (W1)
+    CHECK_EQ(count_words(QString("<html><head><title>Ignored Title</title></head>"
+                                 "<body class=\"c\"><p>one two</p></body></html>")), 2);
+    CHECK_EQ(count_words(QString("<head><title>x y</title></head>a b")), 2);
+    CHECK_EQ(count_words(QString("<BODY>a b c</BODY>")), 3);
+    // self-closing <script/> must not swallow prose; comments are dropped (W2)
+    CHECK_EQ(count_words(QString("a<script src=\"x.js\"/>b c<script>d</script>e")), 4);
+    CHECK_EQ(count_words(QString("a<!-- <p> x > y --> b")), 2);
+    CHECK_EQ(count_words(QString("<styles>a</styles>")), 1);
+    // punctuation-only tokens are not words (W3)
+    CHECK_EQ(count_words(QString::fromUtf8("Chapter * * * end \xe2\x80\x94 fin")), 3);
+    CHECK_EQ(count_words(QString("x &mdash; y")), 2);
+    CHECK_EQ(count_words(QString("caf&eacute; ok")), 2);
+    // numeric and named space entities separate words (W4)
+    CHECK_EQ(count_words(QString("a&#xa0;b")), 2);
+    CHECK_EQ(count_words(QString("a&#xA0;b")), 2);
+    CHECK_EQ(count_words(QString("a&#8201;b")), 2);
+    CHECK_EQ(count_words(QString("a&thinsp;b&ensp;c&emsp;d")), 4);
+    CHECK_EQ(count_words(QString("a&#9999999;b")), 2); // > U+10FFFF -> space
+    CHECK_EQ(count_words(QString("a&#0;b")), 2);
 
     // --- join_path: manifest href resolution ---
     CHECK_EQ(join_path(QString("OEBPS"), QString("text/ch1.xhtml")), QString("OEBPS/text/ch1.xhtml"));

@@ -44,11 +44,11 @@ Status: `[ ]` offen · `[~]` in Arbeit · `[x]` erledigt · `[!]` blockiert (Gru
 
 ## Genauigkeit der Wortzählung
 
-- [ ] **W1** Nur `<body>` zählen (nicht `<title>`/`<head>`).
-- [ ] **W2** Self-closing `<script …/>` darf keinen Text verschlucken;
+- [x] **W1** Nur `<body>` zählen (nicht `<title>`/`<head>`).
+- [x] **W2** Self-closing `<script …/>` darf keinen Text verschlucken;
   `<!-- … -->` vor dem Tag-Strip entfernen.
-- [ ] **W3** Reine Satzzeichen-Tokens nicht als Wort zählen (`* * *`, `—`).
-- [ ] **W4** Weitere Entities: `&#xa0;`, `&thinsp;`, `&ensp;`, `&emsp;`.
+- [x] **W3** Reine Satzzeichen-Tokens nicht als Wort zählen (`* * *`, `—`).
+- [x] **W4** Weitere Entities: `&#xa0;`, `&thinsp;`, `&ensp;`, `&emsp;`.
 - [ ] **W5** Kleinkram: Encoding-Erkennung, `linear="no"`, `join_path`
   normalisiert bei leerem `opf_dir` nicht.
 
@@ -73,11 +73,9 @@ Status: `[ ]` offen · `[~]` in Arbeit · `[x]` erledigt · `[!]` blockiert (Gru
   *(für Tolino 5.18 unkritisch: `llvm-nm` liefert gerade Adressen, alle
   Klassifikationen stimmen; für andere Binaries absichern)*;
   `defsyms.txt` mit nur einer Spalte (reine Namensliste) unterstützen.
-- [~] **R4** Fixture erweitern: `mimetype`, `<title>`, Unterordner,
-  prozent-kodierter Href, fehlende Spine-Datei. *Erledigt: `mimetype`,
-  prozent-kodierter Href, fehlende Spine-Datei, Generator
-  `hook/tests/fixtures/make_sample_epub.py`. Offen: `<title>`, Unterordner
-  (zusammen mit W1).*
+- [x] **R4** Fixture erweitern: `mimetype`, `<title>`, Unterordner,
+  prozent-kodierter Href, fehlende Spine-Datei. *Generator:
+  `hook/tests/fixtures/make_sample_epub.py`.*
 
 ## Kobo-Kompatibilität (Z2)
 
@@ -134,3 +132,4 @@ Aufgaben:
 - 2026-10-19: H2 erledigt (thread_local, ForceKoboScope, README präzisiert).
 - 2026-10-19: M5 erledigt; neue Befunde N1, N2 aufgenommen.
 - 2026-10-19: KC1, KC2 (alle Hooks/dlsyms optional), K3 (README-Limits neu) erledigt.
+- 2026-10-19: W1–W4 und R4 erledigt (count_words neu, 44 Host-Checks).
