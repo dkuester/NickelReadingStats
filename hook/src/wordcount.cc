@@ -1,8 +1,8 @@
 /*
  * wordcount.cc — count words per spine item of a plain epub.
  *
- * Reads the epub zip with Qt's private QZipReader (present in the 5.18
- * libQt6Gui), locates the OPF, parses the spine order, and counts words in
+ * Reads the epub zip with Qt's private QZipReader (exported by libQt6Gui on
+ * firmware 5.18+), locates the OPF, parses the spine order, and counts words in
  * each spine XHTML file. Self-contained: no libnickel internals are touched
  * here — only Qt6Core/Qt6Gui.
  */

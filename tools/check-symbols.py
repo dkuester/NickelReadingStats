@@ -2,7 +2,8 @@
 """Verify NickelReadingStats hook/dlsym symbols against the target firmware.
 
 Local dev tool — needs the target firmware (libnickel.so.1.0.0) and its
-exported-symbol list (defsyms.txt), both extracted from a Tolino 5.18 image.
+exported-symbol list (defsyms.txt), both extracted from the target 5.18+
+firmware image (Tolino or Kobo).
 Neither file is committed (proprietary); keep them in a local scratch dir.
 
 Three checks:

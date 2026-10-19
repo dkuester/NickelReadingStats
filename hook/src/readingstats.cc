@@ -1,40 +1,40 @@
 /*
- * NickelReadingStats — restore Kobo "Reading Stats" on Tolino firmware (5.18+/6.x)
+ * NickelReadingStats — restore Kobo "Reading Stats" on Tolino and enable them
+ * for plain epubs (firmware 5.18+, Qt 6.5.2; verified against Tolino 5.18)
  *
  * What it does and why:
  *
- * On Tolino devices the Kobo "Reading Stats" feature is disabled by two
- * independent gates in libnickel.so.1.0.0:
+ * Kobo and Tolino share one libnickel.so.1.0.0; Device::isTolino() switches
+ * between them at runtime. The reading stats are held back by several
+ * independent gates:
  *
- *   1. Device::supportsReadingLife()  returns `!Device::isTolino()`.
- *      On a Tolino this is false, so the whole Reading Life / reading-stats
- *      UI (the per-book "Reading stats" page and the reading-menu stats tab)
- *      is never offered. This is the "Kobo mode vs. Tolino mode" difference.
- *
- *   2. ReadingView::supportsReadingStats() requires the book's MIME type to
- *      be `application/x-kobo-epub+zip` (kepub). Sideloaded plain epubs
- *      (`application/epub+zip`) therefore never show stats either, even on a
- *      real Kobo. hasValidReadingStats() additionally re-checks the Tolino
- *      flag and a merged TOC/spine index that plain epubs do not have.
- *
- *   3. EventEngine::startReadingSession()/endReadingSession() return early on
- *      Tolino because they check isTolino() directly. That is the Kobo
- *      reading-session tracking which feeds the Activity metrics
- *      ("hours read", "minutes per session", "pages per minute"). On a Tolino
- *      those stay at 0 because no session is ever recorded.
+ *   1. Device::supportsReadingLife() returns `!isTolino()`: the whole
+ *      Reading Life / stats UI is off on a Tolino.
+ *   2. Device::supportsActivityInMore() checks isTolino() itself, so the
+ *      "Activity" entry in the More menu stays hidden even with (1) fixed.
+ *   3. EventEngine::startReadingSession()/endReadingSession() (session time)
+ *      and fireEvent()/fireEventSlot() (page turns) return early on a Tolino,
+ *      so the Activity metrics stay at 0.
+ *   4. ReadingView::supportsReadingStats() accepts kepubs only, on Kobo too;
+ *      hasValidReadingStats() adds a merged TOC/spine check on Tolino.
+ *   5. ReadingView::updateWordCounts() counts words for kepubs only, and
+ *      mergedTOCAndSpineIndex() is never computed for plain epubs, so the
+ *      chapter bars and time estimates stay empty.
  *
  * The hooks below:
- *   - force supportsReadingLife() to true  -> restore the feature on Tolino
- *   - re-enable supportsActivityInMore() on Tolino -> the "Activity" entry
- *     in the More menu (it is gated by isTolino() directly, independently
- *     of supportsReadingLife(), which is why it stayed hidden)
- *   - relax supportsReadingStats()/hasValidReadingStats() to accept any
- *     reflowable (non-fixed-layout) book -> plain epubs work too
- *   - force FeatureSettings::bookSpecificStatsEnabled() to true
+ *   - (1) force supportsReadingLife() and bookSpecificStatsEnabled() to true
+ *   - (2) re-run supportsActivityInMore() without its isTolino() early-out
+ *     (device-class and parental-control guards kept, fail closed)
+ *   - (3) run the EventEngine calls with isTolino() reporting false on the
+ *     calling thread only, for the duration of the call (ForceKoboScope)
+ *   - (4) mirror the original supportsReadingStats() for plain epubs: same
+ *     accessibility and fixed-layout guards, kepub check swapped for epub
+ *   - (5) count plain-epub words ourselves (wordcount.cc, background thread,
+ *     cached) and fall back to the raw spine chapterIndex()
  *
- * Fixed-layout content (fixed-layout epubs, PDFs, comics) is still excluded,
- * because the stats estimator has nothing meaningful to show there and this
- * is what keeps the feature "robust" rather than showing garbage.
+ * Every hook calls the original first and keeps a positive answer, so kepubs
+ * and Kobo behaviour are unchanged; on a Kobo the Tolino hooks pass through.
+ * Fixed-layout content (fixed-layout epubs, PDFs, comics) stays excluded.
  */
 
 #include <NickelHook.h>
@@ -108,7 +108,7 @@ struct ForceKoboScope {
 
 static struct nh_info NickelReadingStats = {
     .name = "NickelReadingStats",
-    .desc = "Restore Kobo reading stats on Tolino 5.18+/6.x and enable them for plain epubs",
+    .desc = "Restore Kobo reading stats on Tolino and enable them for plain epubs (firmware 5.18+)",
     .uninstall_flag = "/mnt/onboard/readingstats_uninstall",
 };
 
@@ -317,8 +317,10 @@ _nh_Device__isTolino(Device *device) {
     if (g_force_kobo_session) {
         return false;
     }
+    // NickelHook sets .out before installing the hook, so this cannot be NULL
+    // here; the check is purely defensive and keeps the Tolino answer.
     if (!Device__isTolino) {
-        return true;  // fallback: preserve original Tolino behaviour
+        return true;
     }
     return Device__isTolino(device);
 }
@@ -425,8 +427,10 @@ _nh_ReadingView__hasValidReadingStats(ReadingView *view) {
 // highlighted correctly.
 extern "C" __attribute__((visibility("default"))) int
 _nh_ReadingView__mergedTOCAndSpineIndex(ReadingView *view) {
+    // Defensive only (see _nh_Device__isTolino); -1 is the original's own
+    // "not computed" value, which its callers already handle.
     if (!ReadingView__mergedTOCAndSpineIndex) {
-        return 0;
+        return -1;
     }
     if (ReadingView__chapterIndex && is_plain_epub(view)) {
         return ReadingView__chapterIndex(view);

@@ -59,14 +59,14 @@ Status: `[ ]` offen · `[~]` in Arbeit · `[x]` erledigt · `[!]` blockiert (Gru
 
 ## Konsistenz und Doku
 
-- [ ] **K1** Kopfkommentar in `readingstats.cc` („two gates“ vs. 3, Hook-Liste
+- [x] **K1** Kopfkommentar in `readingstats.cc` („two gates“ vs. 3, Hook-Liste
   unvollständig).
-- [ ] **K2** Versionsangaben vereinheitlichen („5.18+/6.x“ vs. „5.18“).
+- [x] **K2** Versionsangaben vereinheitlichen („5.18+/6.x“ vs. „5.18“).
 - [x] **K3** README: doppelter Fixed-Layout-Absatz.
 - [x] **K4** `chapterIndex` fehlt in `EXPECTED` von `check-symbols.py`;
   Symbole ohne Erwartung sollen als Fehler zählen. *Gegen Tolino-5.18-
   `libnickel` (BuildID bcfe1a2b…) geprüft: 19/19 Symbole, 7/7 Konventionen OK.*
-- [ ] **K5** Tote Fallbacks (`!Device__isTolino` → `true`, `mergedTOC` → `0`)
+- [x] **K5** Tote Fallbacks (`!Device__isTolino` → `true`, `mergedTOC` → `0`)
   aufräumen oder kommentieren.
 - [ ] **K6** `extract()` aus beiden Python-Tools in ein gemeinsames Modul.
 
@@ -150,3 +150,4 @@ Aufgaben:
 - 2026-10-19: M7 erledigt (BoundedZip, 8 MB/Eintrag, Tests mit Limit).
 - 2026-10-19: M6 erledigt (Hintergrund-Thread, Cache, Host-Test); N3 aufgenommen.
 - 2026-10-19: Suche nach Clara-BW-5.x-Firmware: öffentlich nicht verfügbar (KC3 bleibt blockiert).
+- 2026-10-19: K1, K2, K5 erledigt (Kopfkommentar, „5.18+“ einheitlich, Fallbacks dokumentiert).
