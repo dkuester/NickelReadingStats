@@ -21,8 +21,15 @@ Status: `[ ]` offen · `[~]` in Arbeit · `[x]` erledigt · `[!]` blockiert (Gru
 - [x] **H2** `g_force_kobo_session`: `thread_local` und RAII-Guard statt
   4× kopiertem prev/set/restore. README-Aussage „nur während dieser Calls“
   präzisieren (synchrone Slots in `fireEventSlot` laufen mit).
-- [ ] **H2b** Auf dem Gerät prüfen, ob der Kobo-Event-Pfad Analytics/Netzwerk an
-  Kobo auslöst (Netzwerk-Mitschnitt oder `AnalyticsEvents`-Tabelle). *(braucht Gerät)*
+- [~] **H2b** Auf dem Gerät prüfen, ob der Kobo-Event-Pfad Analytics/Netzwerk an
+  Kobo auslöst. *Auswertung `KoboReader.sqlite` (Tolino 5.18.264769, 2026-10-19):
+  Die Tabelle `AnalyticsEvents` enthält `OpenContent`/`leave_content` auch für
+  sideloaded EPUBs, mit Titel, Autor, ISBN, Fortschritt, Lesesekunden und
+  Seitenwechseln. Die Warteschlange enthält nur Einträge von heute, wird also
+  regelmäßig übertragen. Die Reading-Life-Events tragen einen `GA4`-Block
+  (`book_id` = Dateipfad); `Analytics.conf` (Tolino-Backup) zeigt auf einen
+  Google-Endpunkt. Ob diese Einträge ohne Mod ebenfalls entstehen, ist offen:
+  kein Vergleich ohne Mod vorhanden → N4.*
 - [x] **H3** Wortzählung: fehlende Spine-Datei → `0` anhängen statt überspringen
   (Index-Verschiebung). Manifest-Hrefs prozent-dekodieren.
 
@@ -143,6 +150,22 @@ Aufgaben:
   liest die Typinfo über die ELF-Relocations: 5.18 OK (13 Basen, base[0] =
   `QWidget`, Offset 0, public).*
 
+- [ ] **N4** Vergleichstest ohne Mod: `readingstats_uninstall` anlegen,
+  neu starten, ein sideloaded EPUB kurz lesen, `KoboReader.sqlite` ziehen
+  (vor dem nächsten Sync/WLAN) und `AnalyticsEvents` vergleichen. Entstehen
+  `OpenContent`/`leave_content` für sideloaded EPUBs nur mit Mod, die
+  Analytics-Übertragung während `ForceKoboScope` unterdrücken (Hook auf die
+  Analytics-Enqueue-Funktion, nur solange das Flag gesetzt ist) oder in der
+  README darauf hinweisen. Unabhängig davon: Datenschutz-/Nutzungsdaten-
+  Einstellung des Tolino prüfen.
+
+Geräte-Auswertung N1 (2026-10-19): Aus der Datenbank nicht entscheidbar, weil
+die Kapitel-Wortzahlen nur im Speicher liegen (`ReadingView+0xa4`). Seit H3 hat
+die Liste genau so viele Einträge wie die Spine, und `chapterIndex()` liegt
+darin; die Bereichsprüfung des Originals wäre damit erfüllt. Der Override
+bleibt vorerst bestehen; Risiko gering. Die Sitzungsaufzeichnung funktioniert
+für sideloaded EPUBs (14 Sitzungen, 3017 s, Start/Ende paarweise).
+
 ## Log
 
 - 2026-10-19: Datei angelegt, Branch `review/code-review-fixes` erstellt.
@@ -165,3 +188,4 @@ Aufgaben:
 - 2026-10-19: R2 erledigt (Job wordcount-qt6; beide Jobs installieren make/g++/pkg-config explizit).
 - 2026-10-19: Branch nach Codeberg gepusht (Sicherung, kein PR).
 - 2026-10-19: N2, N3 erledigt (hasOnlyImages nachgebildet; Typinfo-/vtable-Checks).
+- 2026-10-19: Gerätetest ok (User). Merge von PR #1, Branch gelöscht. KoboReader.sqlite ausgewertet: H2b teilweise, N4 neu, N1 bewertet.
