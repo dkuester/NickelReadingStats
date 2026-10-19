@@ -16,7 +16,21 @@ jobs:
         with:
           submodules: true  # test_hook_async includes NickelHook/NickelHook.h
       - name: Install Qt5 (incl. private headers)
-        run: apt-get update && apt-get install -y --no-install-recommends qtbase5-dev qtbase5-private-dev
+        run: apt-get update && apt-get install -y --no-install-recommends qtbase5-dev qtbase5-private-dev pkg-config make g++
+      - name: Build and run word-count unit tests
+        run: make -C hook/tests check
+
+  wordcount-qt6:
+    # The same host tests against Qt6, the major version the hook is built
+    # for (Debian bookworm ships 6.4; the device has 6.5.2). tests/Makefile
+    # prefers Qt6 when its pkg-config files are present.
+    runs-on: codeberg-tiny
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true  # test_hook_async includes NickelHook/NickelHook.h
+      - name: Install Qt6 (incl. private headers)
+        run: apt-get update && apt-get install -y --no-install-recommends qt6-base-dev qt6-base-private-dev pkg-config make g++
       - name: Build and run word-count unit tests
         run: make -C hook/tests check
 

@@ -156,8 +156,8 @@ Three levels, from cheap to thorough:
    `defsyms.txt` and `libnickel.so.1.0.0` come from the Tolino firmware
    (proprietary) and are deliberately not in the repo — pass the local path.
 
-3. **CI** (`.forgejo/workflows/ci.yml`) — on every push it installs Qt5 and
-   runs the host unit tests, plus the firmware-independent manifest check
+3. **CI** (`.forgejo/workflows/ci.yml`) — on every push it runs the host unit
+   tests twice, against Qt5 and against Qt6, plus the firmware-independent manifest check
    (`tools/check-manifest.py`), which verifies the `.sym`/`.name` symbols in
    the source match `tools/symbols.txt` (firmware-verified) exactly. The
    ARM/Qt6 cross-compile build stays local (the toolchain image is ~3.4 GB, too

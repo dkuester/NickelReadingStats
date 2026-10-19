@@ -79,7 +79,7 @@ Status: `[ ]` offen · `[~]` in Arbeit · `[x]` erledigt · `[!]` blockiert (Gru
 ## Repo, CI, Tools
 
 - [x] **R1** `tools/__pycache__/*.pyc` aus Git entfernen und ignorieren.
-- [ ] **R2** CI-Job mit Qt6 zusätzlich zu Qt5.
+- [x] **R2** CI-Job mit Qt6 zusätzlich zu Qt5. *Lokal in `debian:bookworm` geprüft: Qt 5.15.8 und Qt 6.4.2 grün.*
 - [x] **R3** `check-symbols.py`: VMA ≠ Datei-Offset und Thumb-Bit prüfen;
   `defsyms.txt` mit nur einer Spalte (reine Namensliste) unterstützen.
   *Umgesetzt über PT_LOAD-Segmente. Im 5.18-Binary weicht das Datensegment
@@ -160,3 +160,4 @@ Aufgaben:
 - 2026-10-19: M8 erledigt (Rückgabetypen korrigiert, HOOK_RETURNS-Check).
 - 2026-10-19: K6, R3 erledigt (tools/nhsyms.py, ELF-Segment-Mapping, Thumb-Bit, Namenslisten).
 - 2026-10-19: W5 erledigt (55 Host-Checks).
+- 2026-10-19: R2 erledigt (Job wordcount-qt6; beide Jobs installieren make/g++/pkg-config explizit).
