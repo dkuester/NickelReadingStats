@@ -13,3 +13,8 @@ hook/Kobo.tgz
 hook/KoboRoot.tgz
 hook/tests/test_wordcount
 hook/tests/test_epub_words
+
+# Python bytecode
+__pycache__/
+*.pyc
+hook/tests/test_hook_async

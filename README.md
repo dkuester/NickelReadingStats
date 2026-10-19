@@ -41,13 +41,17 @@ The mod hooks:
 The three metrics "hours read", "minutes per session" and "pages per minute"
 are fed by the reading-session tracking (`startReadingSession`/
 `endReadingSession`). Those check `isTolino()` internally and skip the entire
-Kobo recording on a Tolino. The hook runs them with a `g_force_kobo_session`
-flag that makes `isTolino()` return `false` only during those calls — the rest
-of the device (Tolino store/cloud/DRM) keeps its normal behaviour.
+Kobo recording on a Tolino. The hook runs them with a thread-local
+`g_force_kobo_session` flag that makes `isTolino()` return `false` only on the
+calling thread and only while those calls run. Other threads, and all code
+outside these calls (Tolino store/cloud/DRM), keep the real value. Caveat: the
+window covers everything those calls do synchronously, including directly
+connected slots of signals they emit.
 
-Page turns are recorded separately: they are dispatched through
-`EventEngine::fireEventSlot()`, which also checks `isTolino()` and bails out on
-a Tolino. The hook runs it with the same flag so page turns are counted.
+Page turns are recorded separately: `ReadingView::onPageTurned()` calls
+`EventEngine::fireEvent()`, which schedules `EventEngine::fireEventSlot()`.
+Both check `isTolino()` and bail out on a Tolino, so the hook runs both with
+the same flag so page turns are counted.
 
 Important: the "Activity" entry depends on `supportsActivityInMore()`, which
 returns `false` on a Tolino because of `isTolino()` — independently of
@@ -56,10 +60,12 @@ re-runs the original check (`!isTolino() && deviceClass == 2 &&
 !ParentalControl`) but drops only the `isTolino()` gate; the device-class and
 parental-control guards remain.
 
-Fixed-layout content (fixed-layout EPUBs, PDF, comics) is deliberately
-excluded — `ReadingView::isFixedLayout()` is resolved via `dlsym` for that. The
-hooks call the original function first and only intervene when Nickel itself
-returns `false`, so existing behaviour (e.g. kepub on Kobo) is unchanged.
+Which books get stats: the hooks call the original function first and keep a
+`true`. Otherwise they apply the original `supportsReadingStats()` rule with
+only its kepub requirement replaced by "plain EPUB" (`application/epub+zip`):
+the content's accessibility state must not be 6, the book must not consist of
+images only (`hasOnlyImages()`), and it must not be fixed-layout. Fixed-layout content (fixed-layout EPUBs, PDF, comics) and other
+formats stay excluded, and a kepub that Nickel rejects stays rejected.
 
 ## Word counting for regular EPUBs
 
@@ -78,18 +84,24 @@ a sideloaded EPUB itself:
    the words.
 5. Deliver the `QList<int>` to Nickel via `ReadingView::gotWordCounts()`.
 
+Steps 3–4 run on a single background thread, like Nickel's own kepub word
+counter, so opening a book never blocks the UI. The result is delivered on the
+GUI thread, only if the view still exists and still shows the same book.
+Results are cached per file (invalidated when size or mtime change), and each
+zip entry is capped at 8 MB uncompressed.
+
 This fills the chapter bars and makes the time-based estimates plausible for
 regular EPUBs too. Note: a book made of a single large HTML file yields exactly
 one bar — that is correct, not an empty view.
 
 ## Limits ("robust" here means: degrade gracefully, don't crash)
 
-Fixed-layout content (fixed-layout EPUBs, PDF, comics) is deliberately
-excluded — `ReadingView::isFixedLayout()` is resolved via `dlsym` for that.
-Word counting only runs when all dlsym targets are present; if one is missing
-it is silently skipped rather than crashing. The hooks call the original
-function first and only intervene when Nickel provides nothing, so existing
-behaviour (e.g. kepub on Kobo) is unchanged.
+Every hook and `dlsym` target is marked optional: if a 5.18+ build lacks a
+symbol, only the feature that needs it is lost instead of the whole mod
+(NickelHook logs each unresolved symbol). Checks that cannot be evaluated fail
+closed — no stats, no Activity entry — rather than open. Existing behaviour
+(e.g. kepub on Kobo) is unchanged because the original function always runs
+first.
 
 ## Building
 
@@ -104,7 +116,7 @@ Prerequisite: the Docker image `strayrose/nickeltc:latest`
 
 Three levels, from cheap to thorough:
 
-1. **Host unit tests** (`hook/tests/`) — two binaries, both against the host
+1. **Host unit tests** (`hook/tests/`) — three binaries, all against the host
    Qt:
 
    - `test_wordcount` exercises the pure logic (tokenising, script/style
@@ -114,8 +126,12 @@ Three levels, from cheap to thorough:
      included — against a fixture EPUB (`fixtures/sample.epub`) and asserts the
      exact per-chapter counts. It needs QtGui's private `qzipreader_p.h`, so it
      only builds where those private headers are installed.
+   - `test_hook_async` includes `readingstats.cc` with fake libnickel
+     function pointers and checks the background word counting: delivery,
+     cache, and that a view closed or reused for another book meanwhile gets
+     nothing. Same private-header requirement.
 
-   Run both with:
+   Run all with:
 
        make -C hook/tests check
 
@@ -124,18 +140,28 @@ Three levels, from cheap to thorough:
    that each dlsym return convention (sret/value vs. reference/pointer) matches
    the function declared in the hook. This exact convention was the reason for
    the book-open crash: `Content::getMimeType()` returns `QByteArray&`, not
-   `QByteArray` by value. Needs the proprietary firmware files:
+   `QByteArray` by value. It also checks the hard-coded `ReadingView` →
+   `Content` offset (`kReadingViewContentOffset`, 0x94 on 5.18) against the
+   instruction in `ReadingView::updateWordCounts()` that computes it, that
+   `ReadingView`'s first base is still `QWidget` at offset 0 (the hook uses
+   the view as a `QObject`), and that the virtual call in the original
+   `supportsReadingStats()` still resolves to `hasOnlyImages()` — via the
+   typeinfo/vtable relocations. Needs the
+   proprietary firmware files:
 
        python3 tools/check-symbols.py \
            --source hook/src/readingstats.cc \
            --defsyms <defsyms.txt> \
            --firmware <libnickel.so.1.0.0>
 
+   Generate `defsyms.txt` with `llvm-nm -D --defined-only libnickel.so.1.0.0`
+   (addresses are mapped through the ELF load segments; a bare name list
+   also works but only checks existence, reported as `PARTIAL`).
    `defsyms.txt` and `libnickel.so.1.0.0` come from the Tolino firmware
    (proprietary) and are deliberately not in the repo — pass the local path.
 
-3. **CI** (`.forgejo/workflows/ci.yml`) — on every push it installs Qt5 and
-   runs the host unit tests, plus the firmware-independent manifest check
+3. **CI** (`.forgejo/workflows/ci.yml`) — on every push it runs the host unit
+   tests twice, against Qt5 and against Qt6, plus the firmware-independent manifest check
    (`tools/check-manifest.py`), which verifies the `.sym`/`.name` symbols in
    the source match `tools/symbols.txt` (firmware-verified) exactly. The
    ARM/Qt6 cross-compile build stays local (the toolchain image is ~3.4 GB, too

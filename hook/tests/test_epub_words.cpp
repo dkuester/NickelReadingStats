@@ -27,13 +27,28 @@ int main(int argc, char **argv)
     const QString fixture = argc > 1 ? QString::fromLocal8Bit(argv[1])
                                      : QStringLiteral("fixtures/sample.epub");
 
+    // One entry per spine item; see fixtures/make_sample_epub.py.
     const QList<int> counts = count_epub_words(fixture);
-    check("spine item count", counts.size(), 3);
-    if (counts.size() == 3) {
-        check("ch1 words", counts[0], 4);   // alpha beta gamma delta
-        check("ch2 words", counts[1], 2);   // epsilon zeta
-        check("ch3 words", counts[2], 3);   // eta theta iota
+    check("spine item count", counts.size(), 6);
+    if (counts.size() == 6) {
+        check("ch1 words", counts[0], 4);           // alpha beta gamma delta
+        check("ch2 words", counts[1], 2);           // epsilon zeta
+        check("missing file -> 0", counts[2], 0);   // keeps later indices aligned
+        check("ch3 words", counts[3], 3);           // eta theta iota
+        check("subdir + %-encoded href", counts[4], 2); // Text/Kapitel%204.xhtml
+        check("big chapter", counts[5], 600);
     }
+
+    // Per-entry size limit: big.xhtml (~3 KB) is over 2 KB and counts as 0,
+    // the small chapters and the OPF still fit.
+    const QList<int> limited = count_epub_words(fixture, 2048);
+    check("limited: item count", limited.size(), 6);
+    if (limited.size() == 6) {
+        check("limited: ch1 words", limited[0], 4);
+        check("limited: big chapter -> 0", limited[5], 0);
+    }
+    // A limit below the OPF size yields no result at all.
+    check("limit < OPF -> empty", count_epub_words(fixture, 64).size(), 0);
 
     const QList<int> missing =
         count_epub_words(QStringLiteral("fixtures/does-not-exist.epub"));

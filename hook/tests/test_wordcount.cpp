@@ -43,6 +43,26 @@ int main()
     CHECK_EQ(count_words(QString("foo&amp;bar")), 1);
     CHECK_EQ(count_words(QString("a&rsquo;b")), 1);
     CHECK_EQ(count_words(QString("<div class=\"x\">\n<p>para one</p>\n<p>para two</p>\n</div>")), 4);
+    // only the <body> counts (W1)
+    CHECK_EQ(count_words(QString("<html><head><title>Ignored Title</title></head>"
+                                 "<body class=\"c\"><p>one two</p></body></html>")), 2);
+    CHECK_EQ(count_words(QString("<head><title>x y</title></head>a b")), 2);
+    CHECK_EQ(count_words(QString("<BODY>a b c</BODY>")), 3);
+    // self-closing <script/> must not swallow prose; comments are dropped (W2)
+    CHECK_EQ(count_words(QString("a<script src=\"x.js\"/>b c<script>d</script>e")), 4);
+    CHECK_EQ(count_words(QString("a<!-- <p> x > y --> b")), 2);
+    CHECK_EQ(count_words(QString("<styles>a</styles>")), 1);
+    // punctuation-only tokens are not words (W3)
+    CHECK_EQ(count_words(QString::fromUtf8("Chapter * * * end \xe2\x80\x94 fin")), 3);
+    CHECK_EQ(count_words(QString("x &mdash; y")), 2);
+    CHECK_EQ(count_words(QString("caf&eacute; ok")), 2);
+    // numeric and named space entities separate words (W4)
+    CHECK_EQ(count_words(QString("a&#xa0;b")), 2);
+    CHECK_EQ(count_words(QString("a&#xA0;b")), 2);
+    CHECK_EQ(count_words(QString("a&#8201;b")), 2);
+    CHECK_EQ(count_words(QString("a&thinsp;b&ensp;c&emsp;d")), 4);
+    CHECK_EQ(count_words(QString("a&#9999999;b")), 2); // > U+10FFFF -> space
+    CHECK_EQ(count_words(QString("a&#0;b")), 2);
 
     // --- join_path: manifest href resolution ---
     CHECK_EQ(join_path(QString("OEBPS"), QString("text/ch1.xhtml")), QString("OEBPS/text/ch1.xhtml"));
@@ -52,6 +72,13 @@ int main()
     CHECK_EQ(join_path(QString("OEBPS/text"), QString("../images/x.jpg")), QString("OEBPS/images/x.jpg"));
     CHECK_EQ(join_path(QString("OEBPS"), QString("../toc.xhtml")), QString("toc.xhtml"));
     CHECK_EQ(join_path(QString("OEBPS"), QString("a/../b.xhtml")), QString("OEBPS/b.xhtml"));
+    // "." and ".." are collapsed with the OPF at the zip root too
+    CHECK_EQ(join_path(QString(), QString("./ch1.xhtml")), QString("ch1.xhtml"));
+    CHECK_EQ(join_path(QString(), QString("a/../b.xhtml")), QString("b.xhtml"));
+    CHECK_EQ(join_path(QString("OEBPS"), QString("/x/../y.xhtml")), QString("y.xhtml"));
+    // hrefs are URLs: percent-encoded names resolve to the literal zip entry
+    CHECK_EQ(join_path(QString("OEBPS"), QString("Kapitel%201.xhtml")), QString("OEBPS/Kapitel 1.xhtml"));
+    CHECK_EQ(join_path(QString("OEBPS"), QString("%C3%BCber.xhtml")), QString::fromUtf8("OEBPS/\xc3\xbc" "ber.xhtml"));
 
     // --- parse_spine: manifest + spine order ---
     {
@@ -87,6 +114,25 @@ int main()
     {
         CHECK_EQ(parse_spine(QByteArray()).size(), 0);
     }
+    {
+        // linear="no" items stay in the spine (Nickel indexes by position)
+        const QByteArray opf =
+            "<package><manifest><item id=\"a\" href=\"a.xhtml\"/>"
+            "<item id=\"n\" href=\"notes.xhtml\"/><item id=\"b\" href=\"b.xhtml\"/></manifest>"
+            "<spine><itemref idref=\"a\"/><itemref idref=\"n\" linear=\"no\"/>"
+            "<itemref idref=\"b\"/></spine></package>";
+        const QStringList spine = parse_spine(opf);
+        CHECK_EQ(spine.size(), 3);
+        CHECK_EQ(spine.value(1), QString("notes.xhtml"));
+    }
+
+    // --- decode_xhtml: UTF-8 (with/without BOM) and UTF-16 by BOM ---
+    CHECK_EQ(decode_xhtml(QByteArray("\xEF\xBB\xBF" "a b")), QString("a b"));
+    CHECK_EQ(decode_xhtml(QByteArray("a b")), QString("a b"));
+    CHECK_EQ(decode_xhtml(QByteArray("\xFF\xFE" "a\0 \0b\0", 8)), QString("a b"));
+    CHECK_EQ(decode_xhtml(QByteArray("\xFE\xFF" "\0a\0 \0b", 8)), QString("a b"));
+    CHECK_EQ(decode_xhtml(QByteArray("\xFF\xFE" "\xFC\0", 4)), QString::fromUtf8("\xC3\xBC"));
+    CHECK_EQ(count_words(decode_xhtml(QByteArray("\xFF\xFE" "<\0p\0>\0x\0 \0y\0<\0/\0p\0>\0", 22))), 2);
 
     std::printf("%d checks, %d failure(s)\n", g_checks, g_failures);
     return g_failures == 0 ? 0 : 1;

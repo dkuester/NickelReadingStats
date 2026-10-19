@@ -13,17 +13,15 @@ Usage:
 """
 
 import argparse
-import re
+import os
 import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from nhsyms import extract_symbols  # noqa: E402
 
 
 def extract(source_path):
-    text = open(source_path, encoding="utf-8").read()
-    hooks = re.findall(r'\.sym\s*=\s*"([^"]+)"', text)
-    # `.name` is also used for the mod identifier ("NickelReadingStats");
-    # only mangled (_Z...) names are dlsym targets.
-    dlsyms = [n for n in re.findall(r'\.name\s*=\s*"([^"]+)"', text)
-              if n.startswith("_Z")]
+    hooks, dlsyms = extract_symbols(source_path)
     return set(hooks) | set(dlsyms)
 
 
