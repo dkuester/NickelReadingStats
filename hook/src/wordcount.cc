@@ -66,13 +66,18 @@ QList<int> count_epub_words(const QString &epub_path)
     const int slash = opf_path.lastIndexOf(QLatin1Char('/'));
     const QString opf_dir = slash >= 0 ? opf_path.left(slash) : QString();
 
+    // Exactly one entry per spine item, in spine order: Nickel indexes the list
+    // by spine position (chapter bars, mergedTOCAndSpineIndex fallback), so a
+    // missing or empty file must count as 0 rather than shift the rest.
     for (const QString &href : spine_hrefs) {
-        const QString full = join_path(opf_dir, href);
-        const QByteArray xhtml = zip.fileData(full);
-        if (xhtml.isEmpty()) {
-            continue;
-        }
-        counts.append(count_words(QString::fromUtf8(xhtml)));
+        const QByteArray xhtml = zip.fileData(join_path(opf_dir, href));
+        counts.append(xhtml.isEmpty() ? 0 : count_words(QString::fromUtf8(xhtml)));
     }
-    return counts;
+    // Nothing readable at all: report "no data" instead of an all-zero list.
+    for (const int c : counts) {
+        if (c > 0) {
+            return counts;
+        }
+    }
+    return QList<int>();
 }

@@ -28,11 +28,14 @@ int main(int argc, char **argv)
                                      : QStringLiteral("fixtures/sample.epub");
 
     const QList<int> counts = count_epub_words(fixture);
-    check("spine item count", counts.size(), 3);
-    if (counts.size() == 3) {
-        check("ch1 words", counts[0], 4);   // alpha beta gamma delta
-        check("ch2 words", counts[1], 2);   // epsilon zeta
-        check("ch3 words", counts[2], 3);   // eta theta iota
+    // One entry per spine item; see fixtures/make_sample_epub.py.
+    check("spine item count", counts.size(), 5);
+    if (counts.size() == 5) {
+        check("ch1 words", counts[0], 4);           // alpha beta gamma delta
+        check("ch2 words", counts[1], 2);           // epsilon zeta
+        check("missing file -> 0", counts[2], 0);   // keeps later indices aligned
+        check("ch3 words", counts[3], 3);           // eta theta iota
+        check("percent-encoded href", counts[4], 2); // Kapitel%204.xhtml
     }
 
     const QList<int> missing =

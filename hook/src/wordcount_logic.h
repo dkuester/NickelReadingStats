@@ -13,6 +13,7 @@
 #include <QRegularExpression>
 #include <QString>
 #include <QStringList>
+#include <QUrl>
 #include <QXmlStreamReader>
 
 // Count whitespace-separated non-empty tokens in an XHTML string.
@@ -60,8 +61,11 @@ inline int count_words(const QString &html)
 }
 
 // Resolve a manifest href (relative to the OPF directory) to a zip path.
-inline QString join_path(const QString &opf_dir, const QString &href)
+// Manifest hrefs are URLs, so "Chapter%201.xhtml" names the zip entry
+// "Chapter 1.xhtml": percent-decode before joining.
+inline QString join_path(const QString &opf_dir, const QString &raw_href)
 {
+    const QString href = QUrl::fromPercentEncoding(raw_href.toUtf8());
     if (href.startsWith(QLatin1Char('/'))) {
         return href.mid(1);
     }

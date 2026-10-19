@@ -23,7 +23,7 @@ Status: `[ ]` offen · `[~]` in Arbeit · `[x]` erledigt · `[!]` blockiert (Gru
   präzisieren (synchrone Slots in `fireEventSlot` laufen mit).
 - [ ] **H2b** Auf dem Gerät prüfen, ob der Kobo-Event-Pfad Analytics/Netzwerk an
   Kobo auslöst (Netzwerk-Mitschnitt oder `AnalyticsEvents`-Tabelle). *(braucht Gerät)*
-- [ ] **H3** Wortzählung: fehlende Spine-Datei → `0` anhängen statt überspringen
+- [x] **H3** Wortzählung: fehlende Spine-Datei → `0` anhängen statt überspringen
   (Index-Verschiebung). Manifest-Hrefs prozent-dekodieren.
 
 ## Mittlere Priorität
@@ -67,8 +67,11 @@ Status: `[ ]` offen · `[~]` in Arbeit · `[x]` erledigt · `[!]` blockiert (Gru
 - [ ] **R2** CI-Job mit Qt6 zusätzlich zu Qt5.
 - [ ] **R3** `check-symbols.py`: VMA ≠ Datei-Offset und Thumb-Bit prüfen;
   `defsyms.txt` mit nur einer Spalte (reine Namensliste) unterstützen.
-- [ ] **R4** Fixture erweitern: `mimetype`, `<title>`, Unterordner,
-  prozent-kodierter Href, fehlende Spine-Datei.
+- [~] **R4** Fixture erweitern: `mimetype`, `<title>`, Unterordner,
+  prozent-kodierter Href, fehlende Spine-Datei. *Erledigt: `mimetype`,
+  prozent-kodierter Href, fehlende Spine-Datei, Generator
+  `hook/tests/fixtures/make_sample_epub.py`. Offen: `<title>`, Unterordner
+  (zusammen mit W1).*
 
 ## Kobo-Kompatibilität (Z2)
 
@@ -84,8 +87,8 @@ Stand der Analyse:
   (`supportsReadingLife`, `supportsActivityInMore`, `isTolino`, `EventEngine`)
   laufen dort praktisch als Durchreichung. Die EPUB-Erweiterungen
   (`supportsReadingStats`, Wortzählung, `mergedTOC`) wirken auch auf Kobo.
-- Kobos auf Firmware 4.x (Qt 5.2.1) sind **nicht** Ziel dieses Builds.
-  Die drei Kobos in den lokalen KoboPatch-Backups laufen auf 4.38.
+- Rahmen: ausschließlich Firmware 5.18+ (Kobo und Tolino). Ältere
+  Firmware (4.x, Qt 5.2.1) ist ausdrücklich kein Ziel.
 
 Aufgaben:
 
@@ -103,3 +106,5 @@ Aufgaben:
 ## Log
 
 - 2026-10-19: Datei angelegt, Branch `review/code-review-fixes` erstellt.
+- 2026-10-19: Rahmen auf Firmware 5.18+ festgelegt (Vorgabe des Users).
+- 2026-10-19: H3 erledigt (ein Eintrag pro Spine-Item, Prozent-Dekodierung).

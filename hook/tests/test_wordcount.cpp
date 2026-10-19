@@ -52,6 +52,9 @@ int main()
     CHECK_EQ(join_path(QString("OEBPS/text"), QString("../images/x.jpg")), QString("OEBPS/images/x.jpg"));
     CHECK_EQ(join_path(QString("OEBPS"), QString("../toc.xhtml")), QString("toc.xhtml"));
     CHECK_EQ(join_path(QString("OEBPS"), QString("a/../b.xhtml")), QString("OEBPS/b.xhtml"));
+    // hrefs are URLs: percent-encoded names resolve to the literal zip entry
+    CHECK_EQ(join_path(QString("OEBPS"), QString("Kapitel%201.xhtml")), QString("OEBPS/Kapitel 1.xhtml"));
+    CHECK_EQ(join_path(QString("OEBPS"), QString("%C3%BCber.xhtml")), QString::fromUtf8("OEBPS/\xc3\xbc" "ber.xhtml"));
 
     // --- parse_spine: manifest + spine order ---
     {
