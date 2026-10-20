@@ -18,3 +18,4 @@ hook/tests/test_epub_words
 __pycache__/
 *.pyc
 hook/tests/test_hook_async
+hook/tests/test_hook_gates

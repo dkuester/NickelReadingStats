@@ -27,6 +27,8 @@
  *     (device-class and parental-control guards kept, fail closed)
  *   - (3) run the EventEngine calls with isTolino() reporting false on the
  *     calling thread only, for the duration of the call (ForceKoboScope)
+ *     and drop analytics events on a Tolino (stock Tolino queues none; the
+ *     opened Kobo paths would upload title, author and reading time)
  *   - (4) mirror the original supportsReadingStats() for plain epubs: same
  *     accessibility and fixed-layout guards, kepub check swapped for epub
  *   - (5) count plain-epub words ourselves (wordcount.cc, background thread,
@@ -78,6 +80,10 @@ static void (*EventEngine__startReadingSession)(void *, void *, void *, void *);
 static int  (*EventEngine__endReadingSession)(void *, void *, void *, void *);
 static void (*EventEngine__fireEvent)(void *, void *, void *, void *);
 static void (*EventEngine__fireEventSlot)(void *, void *, void *, void *);
+// Member function: this, Device const&, QString const& name, QMap const&
+// attributes, and a bool passed on the stack (read by `ldrb [sp, #0xd0]` in
+// its 5.18 prologue). Returns void.
+static void (*EventEngine__fireAnalyticsEvent)(void *, Device *, void *, void *, bool);
 
 // Resolved via dlsym.
 static bool (*ReadingView__isFixedLayout)(ReadingView *);
@@ -219,6 +225,14 @@ static struct nh_hook NickelReadingStatsHook[] = {
         .lib     = "libnickel.so.1.0.0",
         .out     = nh_symoutptr(EventEngine__fireEventSlot),
         .desc    = "Run the Kobo event dispatch (page turns) on Tolino devices",
+        .optional = true,
+    },
+    {
+        .sym     = "_ZN11EventEngine18fireAnalyticsEventERK6DeviceRK7QStringRK4QMapIS3_8QVariantEb",
+        .sym_new = "_nh_EventEngine__fireAnalyticsEvent",
+        .lib     = "libnickel.so.1.0.0",
+        .out     = nh_symoutptr(EventEngine__fireAnalyticsEvent),
+        .desc    = "Drop analytics events on Tolino (stock Tolino queues none)",
         .optional = true,
     },
     {0},
@@ -395,6 +409,30 @@ _nh_EventEngine__fireEventSlot(void *engine, void *name, void *volume, void *map
     }
     ForceKoboScope scope;
     EventEngine__fireEventSlot(engine, name, volume, map);
+}
+
+// fireAnalyticsEvent() queues an analytics event (AnalyticsEvents table,
+// uploaded on the next sync) if the user's privacy settings allow analytics.
+// It does not check isTolino() itself: on a Tolino its callers are gated
+// instead, and the mod opens them (ForceKoboScope, plus slots such as
+// EventEngine::updateSessionStatsSlot() that run later, outside the scope).
+// Measured on Tolino 5.18 (REVIEW-TODO N4): with the mod, opening/leaving a
+// book queued events with title, author, ISBN and reading time; without it,
+// nothing at all was queued (not even AppStart). So on a real Tolino every
+// event is dropped, which matches the stock behaviour; the reading-life data
+// behind the stats is recorded separately and unaffected. On a Kobo (real
+// isTolino() false) everything passes through. Device__isTolino is the
+// original, so this sees the real value even inside ForceKoboScope.
+extern "C" __attribute__((visibility("default"))) void
+_nh_EventEngine__fireAnalyticsEvent(void *engine, Device *device, void *name, void *attrs,
+                                    bool flag) {
+    if (!EventEngine__fireAnalyticsEvent) {
+        return;
+    }
+    if (Device__isTolino && Device__isTolino(device)) {
+        return;
+    }
+    EventEngine__fireAnalyticsEvent(engine, device, name, attrs, flag);
 }
 
 // Device::supportsActivityInMore() gates the "Activity" entry in the More

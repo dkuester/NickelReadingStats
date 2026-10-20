@@ -32,6 +32,7 @@ The mod hooks:
 | `EventEngine::endReadingSession()` | `_ZN11EventEngine17endReadingSessionE…` | Run the Kobo session-end path on Tolino |
 | `EventEngine::fireEvent()` | `_ZN11EventEngine9fireEventEPKcRK6Vol…` | Run the page-turn event entry on Tolino |
 | `EventEngine::fireEventSlot()` | `_ZN11EventEngine13fireEventSlotE10QByt…` | Record page turns/events on Tolino (pages per minute) |
+| `EventEngine::fireAnalyticsEvent()` | `_ZN11EventEngine18fireAnalyticsEvent…` | Drop analytics events on Tolino (see "Privacy") |
 | `ReadingView::supportsReadingStats()` | `_ZNK11ReadingView20supportsReadingStatsEv` | Allow stats for regular EPUBs |
 | `ReadingView::hasValidReadingStats()` | `_ZN11ReadingView20hasValidReadingStatsEv` | Drop the Tolino-only TOC/spine validation |
 | `ReadingView::updateWordCounts()` | `_ZN11ReadingView16updateWordCountsEv` | Retrofit word counting for regular EPUBs (see below) |
@@ -66,6 +67,18 @@ only its kepub requirement replaced by "plain EPUB" (`application/epub+zip`):
 the content's accessibility state must not be 6, the book must not consist of
 images only (`hasOnlyImages()`), and it must not be fixed-layout. Fixed-layout content (fixed-layout EPUBs, PDF, comics) and other
 formats stay excluded, and a kepub that Nickel rejects stays rejected.
+
+## Privacy
+
+Opening the Kobo reading-life paths on a Tolino would also open Kobo's
+analytics: measured on Tolino 5.18, the mod made Nickel queue events such as
+`OpenContent`/`leave_content` with title, author, ISBN and reading time for
+sideloaded books, which are uploaded on the next sync (if analytics are
+allowed in the privacy settings). Without the mod a Tolino queued none. The
+hook on `EventEngine::fireAnalyticsEvent()` therefore drops every analytics
+event on a Tolino, matching the stock behaviour; the reading-life data that
+feeds the stats is stored separately on the device and is unaffected. On a
+Kobo, analytics are left alone.
 
 ## Word counting for regular EPUBs
 
@@ -116,7 +129,7 @@ Prerequisite: the Docker image `strayrose/nickeltc:latest`
 
 Three levels, from cheap to thorough:
 
-1. **Host unit tests** (`hook/tests/`) — three binaries, all against the host
+1. **Host unit tests** (`hook/tests/`) — four binaries, all against the host
    Qt:
 
    - `test_wordcount` exercises the pure logic (tokenising, script/style
@@ -126,6 +139,8 @@ Three levels, from cheap to thorough:
      included — against a fixture EPUB (`fixtures/sample.epub`) and asserts the
      exact per-chapter counts. It needs QtGui's private `qzipreader_p.h`, so it
      only builds where those private headers are installed.
+   - `test_hook_gates` checks the analytics drop (Tolino vs. Kobo), the scoped
+     `isTolino()` override and the fail-closed Activity entry.
    - `test_hook_async` includes `readingstats.cc` with fake libnickel
      function pointers and checks the background word counting: delivery,
      cache, and that a view closed or reused for another book meanwhile gets
