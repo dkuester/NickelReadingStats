@@ -53,12 +53,20 @@ test_hook_async: test_hook_async.cpp ../src/readingstats.cc ../src/wordcount.cc 
 	    $(EPUB_CPPFLAGS) -I../NickelHook test_hook_async.cpp ../src/wordcount.cc \
 	    -o $@ $(EPUB_LDLIBS)
 
-check: test_wordcount test_epub_words test_hook_async
+# --- hook test: analytics drop, scoped isTolino(), Activity guards ----------
+test_hook_gates: test_hook_gates.cpp ../src/readingstats.cc ../src/wordcount.cc \
+                 ../src/wordcount.h ../src/wordcount_logic.h
+	$(CXX) $(CXXFLAGS) -std=c++20 -Wno-missing-field-initializers \
+	    $(EPUB_CPPFLAGS) -I../NickelHook test_hook_gates.cpp ../src/wordcount.cc \
+	    -o $@ $(EPUB_LDLIBS)
+
+check: test_wordcount test_epub_words test_hook_async test_hook_gates
 	./test_wordcount
 	./test_epub_words fixtures/sample.epub
 	./test_hook_async fixtures/sample.epub
+	./test_hook_gates
 
 clean:
-	rm -f test_wordcount test_epub_words test_hook_async
+	rm -f test_wordcount test_epub_words test_hook_async test_hook_gates
 
 .PHONY: check clean

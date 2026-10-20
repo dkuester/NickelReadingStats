@@ -33,6 +33,7 @@ Das Mod hookt:
 | `EventEngine::endReadingSession()` | `_ZN11EventEngine17endReadingSessionE…` | Kobo-Session-Ende auf Tolino ausführen |
 | `EventEngine::fireEvent()` | `_ZN11EventEngine9fireEventEPKcRK6Vol…` | Seitenumbruch-Einstieg auf Tolino ausführen |
 | `EventEngine::fireEventSlot()` | `_ZN11EventEngine13fireEventSlotE10QByt…` | Seitenumbrüche/Events auf Tolino erfassen (Seiten pro Minute) |
+| `EventEngine::fireAnalyticsEvent()` | `_ZN11EventEngine18fireAnalyticsEvent…` | verwirft Analytics-Ereignisse auf dem Tolino (siehe „Datenschutz“) |
 | `ReadingView::supportsReadingStats()` | `_ZNK11ReadingView20supportsReadingStatsEv` | Statistik für normale EPUBs zulassen |
 | `ReadingView::hasValidReadingStats()` | `_ZN11ReadingView20hasValidReadingStatsEv` | Tolino-only TOC/Spine-Prüfung entschärfen |
 | `ReadingView::updateWordCounts()` | `_ZN11ReadingView16updateWordCountsEv` | Wortzählung für normale EPUBs nachrüsten (siehe unten) |
@@ -70,6 +71,19 @@ Accessibility-Status des Inhalts darf nicht 6 sein, das Buch darf nicht nur
 aus Bildern bestehen (`hasOnlyImages()`) und kein Fixed-Layout sein. Fixed-Layout-Inhalte (Fixed-Layout-EPUBs, PDF, Comics) und
 andere Formate bleiben ausgeschlossen; ein kepub, das Nickel ablehnt, bleibt
 abgelehnt.
+
+## Datenschutz
+
+Wer auf dem Tolino die Kobo-Reading-Life-Pfade öffnet, öffnet auch Kobos
+Analytics: Auf einem Tolino 5.18 gemessen, hat Nickel mit dem Mod Ereignisse
+wie `OpenContent`/`leave_content` mit Titel, Autor, ISBN und Lesezeit für
+sideloaded Bücher eingereiht, die beim nächsten Sync übertragen werden (sofern
+Analytics in den Datenschutz-Einstellungen erlaubt sind). Ohne Mod hat der
+Tolino keine eingereiht. Der Hook auf `EventEngine::fireAnalyticsEvent()`
+verwirft deshalb auf dem Tolino jedes Analytics-Ereignis, wie im
+Originalzustand; die Reading-Life-Daten für die Statistik liegen getrennt auf
+dem Gerät und sind nicht betroffen. Auf einem Kobo bleiben Analytics
+unverändert.
 
 ## Wortzählung für normale EPUBs
 
@@ -122,7 +136,7 @@ Voraussetzung: Docker-Image `strayrose/nickeltc:latest`
 
 Drei Ebenen, von günstig zu gründlich:
 
-1. **Host-Unit-Tests** (`hook/tests/`) — drei Binaries, alle gegen das
+1. **Host-Unit-Tests** (`hook/tests/`) — vier Binaries, alle gegen das
    Host-Qt:
 
    - `test_wordcount` prüft die pure Logik (Tokenisierung, Script-/Style-
@@ -132,6 +146,9 @@ Drei Ebenen, von günstig zu gründlich:
      QZipReader — gegen ein Fixture-EPUB (`fixtures/sample.epub`) aus und
      prüft die exakten Wortzahlen pro Kapitel. Braucht QtGuis privaten
      `qzipreader_p.h` und baut nur, wo diese privaten Header installiert sind.
+   - `test_hook_gates` prüft das Verwerfen der Analytics (Tolino vs. Kobo),
+     den begrenzten `isTolino()`-Override und den fail-closed
+     Aktivität-Eintrag.
    - `test_hook_async` bindet `readingstats.cc` mit gefälschten
      libnickel-Funktionszeigern ein und prüft die Wortzählung im Hintergrund:
      Auslieferung, Cache und dass ein zwischenzeitlich geschlossener oder für

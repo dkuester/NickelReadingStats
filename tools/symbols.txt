@@ -3,6 +3,7 @@
 # via tools/check-symbols.py. Do NOT add a name here without running that check
 # first — CI fails if the source's symbols drift from this list.
 _ZN11EventEngine9fireEventEPKcRK6VolumeRK4QMapI7QString8QVariantE
+_ZN11EventEngine18fireAnalyticsEventERK6DeviceRK7QStringRK4QMapIS3_8QVariantEb
 _ZN11EventEngine13fireEventSlotE10QByteArray6Volume4QMapI7QString8QVariantE
 _ZN11EventEngine17endReadingSessionER6VolumeRK11PluginState4QMapI7QString8QVariantE
 _ZN11EventEngine19startReadingSessionER6VolumeRK11PluginState4QMapI7QString8QVariantE

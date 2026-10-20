@@ -231,6 +231,7 @@ HOOK_RETURNS = {
     "_ZN11EventEngine17endReadingSessionER6VolumeRK11PluginState4QMapI7QString8QVariantE": "value",
     "_ZN11EventEngine9fireEventEPKcRK6VolumeRK4QMapI7QString8QVariantE": "void",
     "_ZN11EventEngine13fireEventSlotE10QByteArray6Volume4QMapI7QString8QVariantE": "void",
+    "_ZN11EventEngine18fireAnalyticsEventERK6DeviceRK7QStringRK4QMapIS3_8QVariantEb": "void",
 }
 
 R0_WRITERS = ("mov", "movs", "mov.w", "movw", "mvn", "mvns", "ldr", "ldr.w", "ldrb",
