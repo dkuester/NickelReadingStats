@@ -47,12 +47,12 @@ Tolino die komplette Kobo-Erfassung. Während der Hook sie ausführt, liefert
 `isTolino()` nur dann `false`, wenn drei Bedingungen zugleich gelten: im
 aufrufenden Thread (thread-lokales Flag), nur für die Dauer dieser Aufrufe und
 nur, wenn es **direkt aus einer der Sperrfunktionen** aufgerufen wird
-(`startReadingSession`, `endReadingSession`, `fireEvent`, `fireEventSlot`),
-erkannt an der Rücksprungadresse. Alles andere sieht den echten Wert: andere
-Threads, Tolino-Shop/-Cloud/-DRM und auch alles, was die Sperrfunktionen
-weiter aufrufen. Auf 5.18 gehört dazu `EventEngine::initialize()`, das sonst
-Kobos Google-Analytics-Sitzung einrichten würde, und die Affiliate-Ermittlung
-(Thalia vs. Kobo). `tools/check-symbols.py` prüft, dass jede Sperrfunktion
+(`startReadingSession`, `endReadingSession`, `fireEvent`, `fireEventSlot`,
+`initialize`), erkannt an der Rücksprungadresse. Alles andere sieht den
+echten Wert: andere Threads, Tolino-Shop/-Cloud/-DRM und auch alles, was die
+Sperrfunktionen weiter aufrufen. Auf 5.18 gehört dazu die
+Affiliate-Ermittlung (Thalia vs. Kobo) und die Wörterbuchliste unterhalb von
+`EventEngine::initialize()`. `tools/check-symbols.py` prüft, dass jede Sperrfunktion
 `isTolino()` selbst aufruft und keine eine Funktion aufruft, die es per
 Tail-Call erreicht.
 

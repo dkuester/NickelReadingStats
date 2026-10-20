@@ -122,18 +122,25 @@ static constexpr unsigned kReadingViewContentOffset = 0x94;
 static thread_local bool g_force_kobo_session = false;
 
 // The window alone is too wide: everything the EventEngine calls run
-// synchronously would see "not Tolino" too. On 5.18 that includes
-// EventEngine::initialize() (sets up Google Analytics and SessionStats),
-// Affiliate::getDeviceAffiliate() and DictionaryFileManager::getAll()
-// (REVIEW-TODO N7). So the override only applies when isTolino() is called
-// directly from one of these gate functions; every other caller, also inside
-// the window, gets the real answer. tools/check-symbols.py verifies that each
-// gate calls isTolino() itself (blx through the PLT, no tail call).
+// synchronously would see "not Tolino" too, e.g. Affiliate::
+// getDeviceAffiliate() (Thalia vs. Kobo) and DictionaryFileManager::getAll()
+// below EventEngine::initialize() (REVIEW-TODO N7). So the override only
+// applies when isTolino() is called directly from one of these gate
+// functions; every other caller, also inside the window, gets the real
+// answer. tools/check-symbols.py verifies that each gate calls isTolino()
+// itself (blx through the PLT, no tail call).
+//
+// initialize() is a gate too: fireEventSlot() calls it on every event and
+// needs it to report "initialised", which it only does on its non-Tolino
+// branch (5.18: `if (isTolino()) return false;`). That branch also sets up
+// Kobo's Google Analytics handler; its events go through fireAnalyticsEvent()
+// and are dropped on a Tolino (on-device: Analytics.conf queue stays empty).
 static const char *const kTolinoGateSymbols[] = {
     "_ZN11EventEngine19startReadingSessionER6VolumeRK11PluginState4QMapI7QString8QVariantE",
     "_ZN11EventEngine17endReadingSessionER6VolumeRK11PluginState4QMapI7QString8QVariantE",
     "_ZN11EventEngine9fireEventEPKcRK6VolumeRK4QMapI7QString8QVariantE",
     "_ZN11EventEngine13fireEventSlotE10QByteArray6Volume4QMapI7QString8QVariantE",
+    "_ZN11EventEngine10initializeEv",
 };
 static constexpr int kTolinoGateCount = sizeof(kTolinoGateSymbols) / sizeof(kTolinoGateSymbols[0]);
 
