@@ -134,12 +134,14 @@ Aufgaben:
 
 ## Neue Befunde während der Umsetzung
 
-- [ ] **N1** `hasValidReadingStats` prüft im Original auf Tolino zusätzlich
-  `wordCountsReady()` und `0 <= mergedTOCAndSpineIndex() < wordCounts.size()`
-  (Feld `+0xac`). Der Hook überspringt diese Bereichsprüfung. Seit H3 und dem
-  `mergedTOC`-Fallback könnte das Original für plain epubs selbst `true`
-  liefern; auf dem Gerät prüfen, ob der Override noch nötig ist bzw. die
-  Bereichsprüfung nachbilden (Absturzrisiko bei Index ≥ Größe).
+- [x] **N1** `hasValidReadingStats` prüft im Original auf Tolino zusätzlich
+  `wordCountsReady()` und `0 <= mergedTOCAndSpineIndex() < wordCounts.size()`.
+  *Disassembly 5.18: `wordCountsReady()` = `wordCounts.size() != 0` (Feld
+  `+0xac`, von `gotWordCounts()` gesetzt); `supportsReadingStats()` und
+  `mergedTOCAndSpineIndex()` ruft das Original über die PLT, also über unsere
+  Hooks. Seit H3/M6 besteht das Original für plain epubs von selbst, sobald
+  die Wortzahlen da sind. Der Override griff nur noch, wenn die Prüfung zu
+  Recht scheitert (leere oder verschobene Liste). → Override entfernt.*
 - [x] **N2** Virtuelle Methode an vtable+0x10c in `supportsReadingStats`
   identifizieren (vtable von `ReadingView` auflösen) und ggf. nachbilden.
   *Ist `ReadingView::hasOnlyImages()`. Keine Unterklasse überschreibt sie →
@@ -170,10 +172,17 @@ Aufgaben:
   (Tolino 5.18.264769, WLAN aus): `AnalyticsEvents` leer; Lesesitzung
   07:16–07:21Z aufgezeichnet (Sitzungen 14 → 18, Lesesekunden 3017 → 5492),
   Fortschritt 66 → 67 %.*
-- [ ] **N6** `PagesTurnedThisSession` ist in allen ausgewerteten Sitzungen 0
-  (auch vor N5). Prüfen, ob im Test umgeblättert wurde; falls ja, erreicht der
-  Seitenwechsel-Pfad (`fireEvent` → `fireEventSlot` → `PageTurnEventHandler`)
-  die Erfassung nicht, und „Seiten pro Minute“ bleibt leer.
+- [~] **N6** `PagesTurnedThisSession` ist in allen ausgewerteten Sitzungen 0.
+  *Analyse: Pfad `onPageTurned` → `fireEvent` (Hook) → Timer → Slot-Objekt
+  → `fireEventSlot` (über PLT, Hook) → `fireSocialEvent` →
+  `PageTurnEventHandler::save` → `saveTransient`; alle `isTolino()`-Sperren
+  liegen in gehookten Aufrufen. Die Null war eine Fehldeutung:
+  `PagesTurnedThisSession` steht im Event, das beim Sitzungsstart geschrieben
+  wird. `Event 46` zählt die Seitenwechsel (10 → 87 zwischen 19. und 20.10.)
+  und wird erst beim nächsten Sitzungsstart geschrieben (Zeitstempel =
+  Sitzungsstart). Offen: Gerätetest – Buch öffnen, ~10 Seiten blättern,
+  schließen, erneut öffnen; dann muss `Event 46` über 87 liegen und
+  „Seiten pro Minute“ einen Wert zeigen.*
 
 Geräte-Auswertung N1 (2026-10-19): Aus der Datenbank nicht entscheidbar, weil
 die Kapitel-Wortzahlen nur im Speicher liegen (`ReadingView+0xa4`). Seit H3 hat
@@ -208,3 +217,4 @@ für sideloaded EPUBs (14 Sitzungen, 3017 s, Start/Ende paarweise).
 - 2026-10-20: N4 durchgeführt: Analytics entstehen nur mit Mod (H2b bestätigt). N5 als Gegenmaßnahme aufgenommen. Mod ist derzeit deinstalliert.
 - 2026-10-20: N5 umgesetzt (Branch fix/drop-forced-analytics), Gerätetest steht aus.
 - 2026-10-20: N5 auf dem Gerät bestätigt (keine Analytics, Statistik läuft). N6 aufgenommen.
+- 2026-10-20: N1 erledigt (Override entfernt), N6 analysiert (vermutlich kein Fehler, Gerätetest offen). Branch fix/page-turns-valid-stats.

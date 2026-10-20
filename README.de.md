@@ -19,8 +19,9 @@ Auf einem Tolino ist die Lesestatistik durch zwei unabhängige Gatter in
 2. `ReadingView::supportsReadingStats()` verlangt den MIME-Typ
    `application/x-kobo-epub+zip` (kepub). Sideloaded EPUBs
    (`application/epub+zip`) bekommen daher auch auf einem echten Kobo keine
-   Statistik. `hasValidReadingStats()` prüft zusätzlich den Tolino-Flag und
-   einen merged-TOC/Spine-Index, den normale EPUBs nicht besitzen.
+   Statistik. `hasValidReadingStats()` verlangt auf dem Tolino zusätzlich
+   Wortzahlen pro Kapitel und einen merged-TOC/Spine-Index innerhalb dieser
+   Liste, die normale EPUBs nicht besitzen.
 
 Das Mod hookt:
 
@@ -35,7 +36,6 @@ Das Mod hookt:
 | `EventEngine::fireEventSlot()` | `_ZN11EventEngine13fireEventSlotE10QByt…` | Seitenumbrüche/Events auf Tolino erfassen (Seiten pro Minute) |
 | `EventEngine::fireAnalyticsEvent()` | `_ZN11EventEngine18fireAnalyticsEvent…` | verwirft Analytics-Ereignisse auf dem Tolino (siehe „Datenschutz“) |
 | `ReadingView::supportsReadingStats()` | `_ZNK11ReadingView20supportsReadingStatsEv` | Statistik für normale EPUBs zulassen |
-| `ReadingView::hasValidReadingStats()` | `_ZN11ReadingView20hasValidReadingStatsEv` | Tolino-only TOC/Spine-Prüfung entschärfen |
 | `ReadingView::updateWordCounts()` | `_ZN11ReadingView16updateWordCountsEv` | Wortzählung für normale EPUBs nachrüsten (siehe unten) |
 | `ReadingView::mergedTOCAndSpineIndex()` | `_ZN11ReadingView22mergedTOCAndSpineIndexEv` | Rohen Spine-Index verwenden, damit gelesene Kapitel hervorgehoben werden |
 | `FeatureSettings::bookSpecificStatsEnabled()` | `_ZN15FeatureSettings24bookSpecificStatsEnabledEv` | Per-Book-Statistik forcieren |
@@ -113,6 +113,13 @@ Damit füllt sich auch bei normalen EPUBs das Kapitel-Balkendiagramm und die
 zeitbasierten Schätzungen werden plausibel. Randnotiz: Bücher, die aus einer
 einzigen großen HTML-Datei bestehen, ergeben genau einen Balken — das ist
 korrekt, keine leere Anzeige.
+
+Ob die Statistikseite eines Buchs angeboten wird, entscheidet Nickels eigenes
+`hasValidReadingStats()`: Es braucht die Wortzahlen und ein aktuelles Kapitel
+innerhalb dieser Liste. Bei einem normalen EPUB ist das erfüllt, sobald die
+Zählung im Hintergrund geliefert hat (meist einen Moment nach dem Öffnen); ein
+Buch, bei dem die Zählung scheitert, bekommt keine Buchstatistik statt einer
+leeren oder verschobenen Ansicht.
 
 ## Grenzen („robust" heißt hier: sauber degradieren, nicht abstürzen)
 

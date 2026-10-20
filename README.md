@@ -18,8 +18,9 @@ On a Tolino, reading stats are disabled by two independent gates in
 2. `ReadingView::supportsReadingStats()` requires the book's MIME type to be
    `application/x-kobo-epub+zip` (kepub). Sideloaded EPUBs
    (`application/epub+zip`) therefore get no stats even on a real Kobo.
-   `hasValidReadingStats()` additionally re-checks the Tolino flag and a
-   merged TOC/spine index that regular EPUBs do not have.
+   `hasValidReadingStats()` additionally requires, on a Tolino, per-chapter
+   word counts and a merged TOC/spine index within them, which regular EPUBs
+   do not have.
 
 The mod hooks:
 
@@ -34,7 +35,6 @@ The mod hooks:
 | `EventEngine::fireEventSlot()` | `_ZN11EventEngine13fireEventSlotE10QByt…` | Record page turns/events on Tolino (pages per minute) |
 | `EventEngine::fireAnalyticsEvent()` | `_ZN11EventEngine18fireAnalyticsEvent…` | Drop analytics events on Tolino (see "Privacy") |
 | `ReadingView::supportsReadingStats()` | `_ZNK11ReadingView20supportsReadingStatsEv` | Allow stats for regular EPUBs |
-| `ReadingView::hasValidReadingStats()` | `_ZN11ReadingView20hasValidReadingStatsEv` | Drop the Tolino-only TOC/spine validation |
 | `ReadingView::updateWordCounts()` | `_ZN11ReadingView16updateWordCountsEv` | Retrofit word counting for regular EPUBs (see below) |
 | `ReadingView::mergedTOCAndSpineIndex()` | `_ZN11ReadingView22mergedTOCAndSpineIndexEv` | Use the raw spine index so read chapters are highlighted |
 | `FeatureSettings::bookSpecificStatsEnabled()` | `_ZN15FeatureSettings24bookSpecificStatsEnabledEv` | Force per-book stats on |
@@ -106,6 +106,12 @@ zip entry is capped at 8 MB uncompressed.
 This fills the chapter bars and makes the time-based estimates plausible for
 regular EPUBs too. Note: a book made of a single large HTML file yields exactly
 one bar — that is correct, not an empty view.
+
+Whether a book's stats page is offered is left to Nickel's own
+`hasValidReadingStats()`: it needs the word counts and a current chapter
+within them. For a plain EPUB that holds as soon as the background count has
+delivered (usually a moment after opening the book); a book whose count fails
+gets no per-book stats rather than an empty or misaligned view.
 
 ## Limits ("robust" here means: degrade gracefully, don't crash)
 
