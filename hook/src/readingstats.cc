@@ -15,8 +15,9 @@
  *   3. EventEngine::startReadingSession()/endReadingSession() (session time)
  *      and fireEvent()/fireEventSlot() (page turns) return early on a Tolino,
  *      so the Activity metrics stay at 0.
- *   4. ReadingView::supportsReadingStats() accepts kepubs only, on Kobo too;
- *      hasValidReadingStats() adds a merged TOC/spine check on Tolino.
+ *   4. ReadingView::supportsReadingStats() accepts kepubs only, on Kobo too.
+ *      hasValidReadingStats() then requires, on Tolino, word counts and
+ *      0 <= mergedTOCAndSpineIndex() < wordCounts.size().
  *   5. ReadingView::updateWordCounts() counts words for kepubs only, and
  *      mergedTOCAndSpineIndex() is never computed for plain epubs, so the
  *      chapter bars and time estimates stay empty.
@@ -30,7 +31,12 @@
  *     and drop analytics events on a Tolino (stock Tolino queues none; the
  *     opened Kobo paths would upload title, author and reading time)
  *   - (4) mirror the original supportsReadingStats() for plain epubs: same
- *     accessibility and fixed-layout guards, kepub check swapped for epub
+ *     accessibility, image-only and fixed-layout guards, kepub check swapped
+ *     for epub. hasValidReadingStats() is NOT hooked: it calls
+ *     supportsReadingStats() and mergedTOCAndSpineIndex() through the PLT,
+ *     so with (5) its range check passes for plain epubs once the word
+ *     counts are in, and it still guards against stats on an empty or
+ *     misaligned list (e.g. while the background count is running)
  *   - (5) count plain-epub words ourselves (wordcount.cc, background thread,
  *     cached) and fall back to the raw spine chapterIndex()
  *
@@ -62,7 +68,6 @@ typedef void Content;
 
 // Original symbols, filled by NickelHook (.out) before our hooks run.
 static bool (*ReadingView__supportsReadingStats)(ReadingView *);
-static bool (*ReadingView__hasValidReadingStats)(ReadingView *);
 static void (*ReadingView__updateWordCounts)(ReadingView *);
 static int  (*ReadingView__mergedTOCAndSpineIndex)(ReadingView *);
 static bool (*Device__supportsReadingLife)(Device *);
@@ -161,14 +166,6 @@ static struct nh_hook NickelReadingStatsHook[] = {
         .lib     = "libnickel.so.1.0.0",
         .out     = nh_symoutptr(ReadingView__supportsReadingStats),
         .desc    = "Allow reading stats for sideloaded (non-kepub) epubs",
-        .optional = true,
-    },
-    {
-        .sym     = "_ZN11ReadingView20hasValidReadingStatsEv",
-        .sym_new = "_nh_ReadingView__hasValidReadingStats",
-        .lib     = "libnickel.so.1.0.0",
-        .out     = nh_symoutptr(ReadingView__hasValidReadingStats),
-        .desc    = "Drop the Tolino-only TOC/spine validation for reading stats",
         .optional = true,
     },
     {
@@ -463,14 +460,6 @@ extern "C" __attribute__((visibility("default"))) bool
 _nh_ReadingView__supportsReadingStats(ReadingView *view) {
     // Preserve the original result; if Nickel already says yes, keep it.
     if (ReadingView__supportsReadingStats && ReadingView__supportsReadingStats(view)) {
-        return true;
-    }
-    return reading_stats_supported(view);
-}
-
-extern "C" __attribute__((visibility("default"))) bool
-_nh_ReadingView__hasValidReadingStats(ReadingView *view) {
-    if (ReadingView__hasValidReadingStats && ReadingView__hasValidReadingStats(view)) {
         return true;
     }
     return reading_stats_supported(view);
