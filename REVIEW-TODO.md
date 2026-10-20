@@ -185,6 +185,29 @@ Aufgaben:
   Buch erneut geöffnet → `Event 46` 87 → 112 (+25), „Seiten pro Minute“ zeigt
   1,1. Kein Fehler im Mod.*
 
+- [ ] **N7** Testerbericht (2026-10-20, Tolino Vision Color, Version v0.1.0):
+  Nach Installation wurde der Tolino „zur Mischung aus Kobo und Tolino“:
+  Kobo-Menüs sichtbar, Thalia-Konto weg (nur Kobo-Konto), Sync defekt;
+  ohne Mod wieder normal, reproduzierbar. *Ursache sehr wahrscheinlich H2
+  (globaler `isTolino()`-Override in v0.1.0, u. a. beim `AppStart` während der
+  Konto-/Sync-Initialisierung). Gegenprobe auf eigenem Tolino mit aktuellem
+  Stand: Sync und Downloads ok, keine Kobo-Menüs; mit v0.1.0 am 19.10.
+  `FailedSync`. Behoben in v0.2.0 (Release 2026-10-20). Restrisiko: Im selben
+  Thread sieht weiterhin alles, was die Sperrfunktionen synchron aufrufen,
+  „kein Tolino“. → Branch `fix/istolino-caller-scope`:*
+  1. Per Firmware-Analyse alle Aufrufer von `isTolino()` in der Kette
+     `start/endReadingSession`, `fireEvent`, `fireEventSlot`,
+     `fireSocialEvent` und deren Callees ermitteln (Liste der Sperrfunktionen).
+  2. Prüfen, dass keine davon `isTolino()` per Tail-Call erreicht.
+  3. Hook: `false` nur, wenn das Fenster aktiv ist **und** der direkte
+     Aufrufer (Rücksprungadresse, Adressbereiche beim Start per `dladdr`/
+     Symbolen bestimmt) eine Sperrfunktion ist; sonst echter Wert.
+  4. `check-symbols.py`: Liste der Sperrfunktionen gegen die Firmware prüfen
+     (rufen `isTolino()` über PLT, kein Tail-Call).
+  5. Host-Test, ARM-Build, Gerätetest: alle drei Activity-Kennzahlen,
+     Buchstatistik, Sync, Konto, Menüs.
+  Testerrückmeldung zu v0.2.0 steht aus.
+
 Geräte-Auswertung N1 (2026-10-19): Aus der Datenbank nicht entscheidbar, weil
 die Kapitel-Wortzahlen nur im Speicher liegen (`ReadingView+0xa4`). Seit H3 hat
 die Liste genau so viele Einträge wie die Spine, und `chapterIndex()` liegt
@@ -220,3 +243,4 @@ für sideloaded EPUBs (14 Sitzungen, 3017 s, Start/Ende paarweise).
 - 2026-10-20: N5 auf dem Gerät bestätigt (keine Analytics, Statistik läuft). N6 aufgenommen.
 - 2026-10-20: N1 erledigt (Override entfernt), N6 analysiert (vermutlich kein Fehler, Gerätetest offen). Branch fix/page-turns-valid-stats.
 - 2026-10-20: Gerätetest N1/N6 bestanden (Statistikseite ok, Seitenwechsel +25, 1,1 Seiten/min, Analytics leer).
+- 2026-10-20: Release v0.2.0 (Tag auf cdcaa94, Asset SHA-256 f36cb4fc…). N7 (Testerbericht) aufgenommen; Branch fix/istolino-caller-scope für den engeren Override.
