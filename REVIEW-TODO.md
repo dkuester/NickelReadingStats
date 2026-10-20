@@ -160,14 +160,20 @@ Aufgaben:
   prüft selbst nicht `isTolino()`, nur `PrivacyPermissionsManager::
   analyticsEnabled()` und `ReadingLifeSettings::getAnalyticsTrackingEnabled()`;
   gesperrt wird auf dem Tolino bei den Aufrufern, die der Mod freischaltet.*
-- [~] **N5** `EventEngine::fireAnalyticsEvent()` hooken. *Umgesetzt auf
+- [x] **N5** `EventEngine::fireAnalyticsEvent()` hooken. *Umgesetzt auf
   `fix/drop-forced-analytics`: Auf einem echten Tolino (Original-`isTolino()`)
   wird jedes Analytics-Ereignis verworfen, auf Kobo nichts. Breiter als
   ursprünglich geplant, weil auch `updateSessionStatsSlot()` außerhalb des
   Fensters Analytics feuert; ohne Mod reiht der Tolino ohnehin keine ein.
   Member-Funktion mit `bool` auf dem Stack, `void`, Aufrufe nur über PLT
-  (GOT-Hook greift). Host-Test `test_hook_gates`. Offen: Gerätetest
-  (`AnalyticsEvents` bleibt leer, Statistik läuft weiter).*
+  (GOT-Hook greift). Host-Test `test_hook_gates`. Gerätetest 2026-10-20
+  (Tolino 5.18.264769, WLAN aus): `AnalyticsEvents` leer; Lesesitzung
+  07:16–07:21Z aufgezeichnet (Sitzungen 14 → 18, Lesesekunden 3017 → 5492),
+  Fortschritt 66 → 67 %.*
+- [ ] **N6** `PagesTurnedThisSession` ist in allen ausgewerteten Sitzungen 0
+  (auch vor N5). Prüfen, ob im Test umgeblättert wurde; falls ja, erreicht der
+  Seitenwechsel-Pfad (`fireEvent` → `fireEventSlot` → `PageTurnEventHandler`)
+  die Erfassung nicht, und „Seiten pro Minute“ bleibt leer.
 
 Geräte-Auswertung N1 (2026-10-19): Aus der Datenbank nicht entscheidbar, weil
 die Kapitel-Wortzahlen nur im Speicher liegen (`ReadingView+0xa4`). Seit H3 hat
@@ -201,3 +207,4 @@ für sideloaded EPUBs (14 Sitzungen, 3017 s, Start/Ende paarweise).
 - 2026-10-19: Gerätetest ok (User). Merge von PR #1, Branch gelöscht. KoboReader.sqlite ausgewertet: H2b teilweise, N4 neu, N1 bewertet.
 - 2026-10-20: N4 durchgeführt: Analytics entstehen nur mit Mod (H2b bestätigt). N5 als Gegenmaßnahme aufgenommen. Mod ist derzeit deinstalliert.
 - 2026-10-20: N5 umgesetzt (Branch fix/drop-forced-analytics), Gerätetest steht aus.
+- 2026-10-20: N5 auf dem Gerät bestätigt (keine Analytics, Statistik läuft). N6 aufgenommen.
