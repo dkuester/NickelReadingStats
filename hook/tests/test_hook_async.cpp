@@ -5,6 +5,7 @@
 // The fake "ReadingView" is a plain QObject: like the real one (QWidget at
 // offset 0), its pointer is its QObject.
 #include "../src/readingstats.cc"
+#include "nh_log_stub.h"
 
 #include <QCoreApplication>
 #include <QDeadlineTimer>

@@ -42,12 +42,17 @@ The mod hooks:
 The three metrics "hours read", "minutes per session" and "pages per minute"
 are fed by the reading-session tracking (`startReadingSession`/
 `endReadingSession`). Those check `isTolino()` internally and skip the entire
-Kobo recording on a Tolino. The hook runs them with a thread-local
-`g_force_kobo_session` flag that makes `isTolino()` return `false` only on the
-calling thread and only while those calls run. Other threads, and all code
-outside these calls (Tolino store/cloud/DRM), keep the real value. Caveat: the
-window covers everything those calls do synchronously, including directly
-connected slots of signals they emit.
+Kobo recording on a Tolino. While the hook runs them, `isTolino()` returns
+`false` under three conditions at once: on the calling thread only
+(thread-local flag), only for the duration of those calls, and only when it
+is called **directly from one of the gate functions** (`startReadingSession`,
+`endReadingSession`, `fireEvent`, `fireEventSlot`), recognised by the return
+address. Everything else keeps the real value: other threads, the Tolino
+store/cloud/DRM, and also everything the gates call further down. On 5.18
+that includes `EventEngine::initialize()`, which would otherwise set up Kobo's
+Google Analytics session, and the affiliate lookup (Thalia vs. Kobo).
+`tools/check-symbols.py` verifies that each gate calls `isTolino()` itself and
+that none calls a function reaching it by a tail call.
 
 Page turns are recorded separately: `ReadingView::onPageTurned()` calls
 `EventEngine::fireEvent()`, which schedules `EventEngine::fireEventSlot()`.

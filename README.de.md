@@ -43,13 +43,18 @@ Das Mod hookt:
 Die drei Kennzahlen „Stunden gelesen", „Minuten pro Sitzung" und „Seiten pro
 Minute" speist die Lesesitzungs-Erfassung (`startReadingSession`/
 `endReadingSession`). Die prüfen intern `isTolino()` und überspringen auf dem
-Tolino die komplette Kobo-Erfassung. Der Hook führt sie mit einem
-thread-lokalen `g_force_kobo_session`-Flag aus, das `isTolino()` nur im
-aufrufenden Thread und nur während dieser Aufrufe `false` liefern lässt.
-Andere Threads und aller Code außerhalb dieser Aufrufe (Tolino-Shop/-Cloud/
--DRM) sehen weiter den echten Wert. Einschränkung: Das Fenster umfasst alles,
-was diese Aufrufe synchron ausführen, auch direkt verbundene Slots von
-Signalen, die sie auslösen.
+Tolino die komplette Kobo-Erfassung. Während der Hook sie ausführt, liefert
+`isTolino()` nur dann `false`, wenn drei Bedingungen zugleich gelten: im
+aufrufenden Thread (thread-lokales Flag), nur für die Dauer dieser Aufrufe und
+nur, wenn es **direkt aus einer der Sperrfunktionen** aufgerufen wird
+(`startReadingSession`, `endReadingSession`, `fireEvent`, `fireEventSlot`),
+erkannt an der Rücksprungadresse. Alles andere sieht den echten Wert: andere
+Threads, Tolino-Shop/-Cloud/-DRM und auch alles, was die Sperrfunktionen
+weiter aufrufen. Auf 5.18 gehört dazu `EventEngine::initialize()`, das sonst
+Kobos Google-Analytics-Sitzung einrichten würde, und die Affiliate-Ermittlung
+(Thalia vs. Kobo). `tools/check-symbols.py` prüft, dass jede Sperrfunktion
+`isTolino()` selbst aufruft und keine eine Funktion aufruft, die es per
+Tail-Call erreicht.
 
 Seitenumbrüche werden separat erfasst: `ReadingView::onPageTurned()` ruft
 `EventEngine::fireEvent()` auf, das `EventEngine::fireEventSlot()` einplant.

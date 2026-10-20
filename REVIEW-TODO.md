@@ -207,6 +207,16 @@ Aufgaben:
   5. Host-Test, ARM-Build, Gerätetest: alle drei Activity-Kennzahlen,
      Buchstatistik, Sync, Konto, Menüs.
   Testerrückmeldung zu v0.2.0 steht aus.
+  *Stand 2026-10-20 (Branch): Schritte 1–4 umgesetzt. Analyse 5.18: von den
+  Sperrfunktionen aus (direkte/PLT-Aufrufe, 6 Ebenen) fragen außerdem
+  `EventEngine::initialize()` (richtet Google Analytics und `SessionStats`
+  ein), `Affiliate::getDeviceAffiliate()` (Thalia/Kobo, nur gelesen, nicht
+  gespeichert) und `DictionaryFileManager::getAll()` `isTolino()` ab – alle
+  analytics-bezogen, alle sehen jetzt den echten Wert. Einziger Tail-Caller
+  von `isTolino()`: `ApplicationSettings::tolinoDemoModeEnabled()`, von keiner
+  Sperrfunktion aufgerufen. Bereiche zur Laufzeit aus `.dynsym`
+  (`dladdr1`, st_size); `check-symbols.py` prüft mit denselben Grenzen.
+  Offen: Gerätetest (Schritt 5).*
 
 Geräte-Auswertung N1 (2026-10-19): Aus der Datenbank nicht entscheidbar, weil
 die Kapitel-Wortzahlen nur im Speicher liegen (`ReadingView+0xa4`). Seit H3 hat
@@ -244,3 +254,4 @@ für sideloaded EPUBs (14 Sitzungen, 3017 s, Start/Ende paarweise).
 - 2026-10-20: N1 erledigt (Override entfernt), N6 analysiert (vermutlich kein Fehler, Gerätetest offen). Branch fix/page-turns-valid-stats.
 - 2026-10-20: Gerätetest N1/N6 bestanden (Statistikseite ok, Seitenwechsel +25, 1,1 Seiten/min, Analytics leer).
 - 2026-10-20: Release v0.2.0 (Tag auf cdcaa94, Asset SHA-256 f36cb4fc…). N7 (Testerbericht) aufgenommen; Branch fix/istolino-caller-scope für den engeren Override.
+- 2026-10-20: N7 Schritte 1–4 auf fix/istolino-caller-scope umgesetzt; Gerätetest offen.

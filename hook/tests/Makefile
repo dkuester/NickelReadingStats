@@ -47,14 +47,14 @@ test_epub_words: test_epub_words.cpp ../src/wordcount.cc ../src/wordcount.h \
 # Includes ../src/readingstats.cc directly (fake libnickel function pointers);
 # same QtGui private-header requirement as test_epub_words. C++20 for the
 # designated initializers in the hook tables.
-test_hook_async: test_hook_async.cpp ../src/readingstats.cc ../src/wordcount.cc \
+test_hook_async: test_hook_async.cpp nh_log_stub.h ../src/readingstats.cc ../src/wordcount.cc \
                  ../src/wordcount.h ../src/wordcount_logic.h fixtures/sample.epub
 	$(CXX) $(CXXFLAGS) -std=c++20 -Wno-missing-field-initializers \
 	    $(EPUB_CPPFLAGS) -I../NickelHook test_hook_async.cpp ../src/wordcount.cc \
 	    -o $@ $(EPUB_LDLIBS)
 
 # --- hook test: analytics drop, scoped isTolino(), Activity guards ----------
-test_hook_gates: test_hook_gates.cpp ../src/readingstats.cc ../src/wordcount.cc \
+test_hook_gates: test_hook_gates.cpp nh_log_stub.h ../src/readingstats.cc ../src/wordcount.cc \
                  ../src/wordcount.h ../src/wordcount_logic.h
 	$(CXX) $(CXXFLAGS) -std=c++20 -Wno-missing-field-initializers \
 	    $(EPUB_CPPFLAGS) -I../NickelHook test_hook_gates.cpp ../src/wordcount.cc \
