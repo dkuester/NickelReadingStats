@@ -6,7 +6,7 @@ exported-symbol list (defsyms.txt), both extracted from the target 5.18+
 firmware image (Tolino or Kobo).
 Neither file is committed (proprietary); keep them in a local scratch dir.
 
-Five checks:
+Six checks:
 1. Every `.sym` (hook) and `.name` (dlsym) mangled name in the source must
    exist in defsyms.txt. Catches typos and symbols that aren't in the firmware.
 2. Every dlsym symbol is disassembled and its return convention is classified
@@ -18,7 +18,9 @@ Five checks:
 4. Class layouts the hook relies on (PRIMARY_BASES: ReadingView* used as
    QObject*) and the virtual calls of originals it mirrors (VIRTUAL_CALLS),
    resolved through typeinfo/vtable relocations.
-5. Every hard-coded struct offset in the source (OFFSETS) matches the
+5. The isTolino() gates (kTolinoGateSymbols): each calls isTolino() itself
+   with bl/blx, and none calls a function that tail-calls isTolino().
+6. Every hard-coded struct offset in the source (OFFSETS) matches the
    instruction that computes it in the firmware.
 
 Usage:
@@ -29,12 +31,13 @@ Usage:
 """
 
 import argparse
+import bisect
 import os
 import re
 import struct
 import sys
 
-from capstone import Cs, CS_ARCH_ARM, CS_MODE_THUMB
+from capstone import Cs, CS_ARCH_ARM, CS_MODE_ARM, CS_MODE_THUMB
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from nhsyms import extract_symbols  # noqa: E402
@@ -131,6 +134,111 @@ class Firmware:
                 relocs[r_offset] = (r_info & 0xFF, symname(r_info >> 8))
         self._relocs = relocs
         return relocs
+
+    def sections(self):
+        """{name: (addr, offset, size)} from the section header table."""
+        d, end = self.data, self.end
+        (shoff,) = struct.unpack_from(end + "I", d, 0x20)
+        shentsize, shnum, shstrndx = struct.unpack_from(end + "HHH", d, 0x2E)
+        raw = [struct.unpack_from(end + "IIIIIIIIII", d, shoff + i * shentsize)
+               for i in range(shnum)]
+        names_off = raw[shstrndx][4]
+        out = {}
+        for sh in raw:
+            stop = d.index(b"\0", names_off + sh[0])
+            out[d[names_off + sh[0]:stop].decode("ascii", "replace")] = (sh[3], sh[4], sh[5])
+        return out
+
+    def dynamic_symbols(self):
+        """{name: (st_value without Thumb bit, st_size)} from .dynsym — the
+        same table the hook's dladdr1(RTLD_DL_SYMENT) reads at runtime."""
+        if getattr(self, "_dynsyms", None) is not None:
+            return self._dynsyms
+        d, end = self.data, self.end
+        secs = self.sections()
+        out = {}
+        if ".dynsym" in secs and ".dynstr" in secs:
+            _a, sym_off, sym_size = secs[".dynsym"]
+            _a, str_off, _s = secs[".dynstr"]
+            for off in range(sym_off, sym_off + sym_size, 16):
+                st_name, st_value, st_size = struct.unpack_from(end + "III", d, off)
+                if st_name and st_value:
+                    stop = d.index(b"\0", str_off + st_name)
+                    out[d[str_off + st_name:stop].decode("ascii", "replace")] = (
+                        st_value & ~1, st_size)
+        self._dynsyms = out
+        return out
+
+    def plt(self):
+        """{entry address: symbol} for the ARM PLT entries
+        (`add ip, pc, #a; add ip, ip, #b; ldr pc, [ip, #c]!`), resolved via
+        the R_ARM_JUMP_SLOT relocation of the GOT slot they load. Thumb
+        callers branch (blx) to the ARM entry; a 4-byte Thumb stub before it
+        is mapped too."""
+        if getattr(self, "_plt", None) is not None:
+            return self._plt
+        sec = self.sections().get(".plt")
+        relocs = self.relocations()
+        out = {}
+        if sec:
+            md = Cs(CS_ARCH_ARM, CS_MODE_ARM)
+            md.skipdata = True  # step over the Thumb `bx pc` stubs between entries
+            addr, _off, size = sec
+            code = self.read(addr, size)
+            insns = list(md.disasm(code, addr))
+            num = r"#(0x[0-9a-f]+|\d+)(?:, #(\d+))?"  # "#imm" or "#imm8, #rot"
+
+            def imm(m):
+                value = int(m.group(1), 0)
+                if m.group(2):  # ARM modified immediate: imm8 rotated right
+                    rot = int(m.group(2))
+                    value = ((value >> rot) | (value << (32 - rot))) & 0xFFFFFFFF
+                return value
+
+            for i in range(len(insns) - 2):
+                a, b, c = insns[i:i + 3]
+                ma = re.match(r"ip, pc, " + num + "$", a.op_str)
+                mb = re.match(r"ip, ip, " + num + "$", b.op_str)
+                mc = re.match(r"pc, \[ip, #(0x[0-9a-f]+|\d+)\]!?$", c.op_str)
+                if a.mnemonic == "add" and b.mnemonic == "add" and c.mnemonic == "ldr" \
+                        and ma and mb and mc:
+                    got = a.address + 8 + imm(ma) + imm(mb) + int(mc.group(1), 0)
+                    rel = relocs.get(got)
+                    if rel and rel[1]:
+                        out[a.address] = rel[1]
+                        out[a.address - 4] = rel[1]
+        self._plt = out
+        return out
+
+    def code_segment(self):
+        """(vaddr, offset, size) of the first PT_LOAD segment (the code)."""
+        return self.segments[0]
+
+    def branches_to(self, targets):
+        """Every Thumb bl/blx/b.w in the code segment whose target is in
+        `targets`, as (address, mnemonic, target)."""
+        vaddr, offset, size = self.code_segment()
+        d = self.data
+        hits = []
+        for i in range(0, size - 4, 2):
+            h1 = d[offset + i] | d[offset + i + 1] << 8
+            if (h1 & 0xF800) != 0xF000:
+                continue
+            h2 = d[offset + i + 2] | d[offset + i + 3] << 8
+            kind = h2 & 0xD000
+            if kind not in (0xD000, 0xC000, 0x9000):
+                continue
+            s_ = (h1 >> 10) & 1
+            j1, j2 = (h2 >> 13) & 1, (h2 >> 11) & 1
+            imm = (s_ << 24) | ((1 - (j1 ^ s_)) << 23) | ((1 - (j2 ^ s_)) << 22) \
+                | ((h1 & 0x3FF) << 12) | ((h2 & 0x7FF) << 1)
+            if s_:
+                imm -= 1 << 25
+            pc = vaddr + i + 4
+            t = (pc & ~3) + imm if kind == 0xC000 else pc + imm
+            if t in targets:
+                hits.append((vaddr + i, {0xD000: "bl", 0xC000: "blx", 0x9000: "b.w"}[kind], t))
+        return hits
 
     def pointer(self, vma, by_address):
         """Resolve the pointer stored at `vma` to a symbol name: via its
@@ -232,6 +340,9 @@ HOOK_RETURNS = {
     "_ZN11EventEngine9fireEventEPKcRK6VolumeRK4QMapI7QString8QVariantE": "void",
     "_ZN11EventEngine13fireEventSlotE10QByteArray6Volume4QMapI7QString8QVariantE": "void",
     "_ZN11EventEngine18fireAnalyticsEventERK6DeviceRK7QStringRK4QMapIS3_8QVariantEb": "void",
+    "_ZN24GoogleAnalyticsRequester10apiRequestERK9QUrlQueryb": "void",
+    "_ZN24GoogleAnalyticsRequester11sendRequestERK4QUrl": "void",
+    "_ZN24GoogleAnalyticsRequester9loadQueueER9QSettings": "void",
 }
 
 R0_WRITERS = ("mov", "movs", "mov.w", "movw", "mvn", "mvns", "ldr", "ldr.w", "ldrb",
@@ -360,6 +471,81 @@ def check_virtual_calls(defsyms, fw, addrs):
     return errors
 
 
+ISTOLINO = "_ZNK6Device8isTolinoEv"
+
+
+def tolino_gates(source_text):
+    """The gate symbols listed in kTolinoGateSymbols in the hook source."""
+    m = re.search(r"kTolinoGateSymbols\[\]\s*=\s*\{(.*?)\};", source_text, re.S)
+    return re.findall(r'"([^"]+)"', m.group(1)) if m else []
+
+
+def check_tolino_gates(source_text, defsyms, fw, addrs):
+    """The isTolino() override applies only when the return address lies in a
+    gate (kTolinoGateSymbols). That is right only if each gate calls
+    isTolino() itself with bl/blx (so LR points into the gate), and if no gate
+    directly calls a function that reaches isTolino() by a tail call (its
+    return address would also be in the gate, so it would wrongly get
+    "not Tolino")."""
+    errors = 0
+    gates = tolino_gates(source_text)
+    if not gates:
+        print("  MISS     kTolinoGateSymbols not found in source")
+        return 1
+    plt = fw.plt()
+    names = by_address(defsyms)
+    tol_entries = {a for a, n in plt.items() if n == ISTOLINO}
+    if ISTOLINO in defsyms:
+        tol_entries |= {defsyms[ISTOLINO], defsyms[ISTOLINO] | 1}
+    if not tol_entries:
+        print("  MISS     no PLT entry for %s" % ISTOLINO)
+        return 1
+    # Functions that reach isTolino() with a tail call (b.w).
+    tail_callers = set()
+    for addr, mn, _t in fw.branches_to(tol_entries):
+        if mn == "b.w":
+            k = bisect.bisect_right(addrs, addr) - 1
+            if k >= 0:
+                tail_callers.add(names.get(addrs[k]))
+    tail_entries = {a for a, n in plt.items() if n in tail_callers}
+    tail_entries |= {defsyms[n] & ~1 for n in tail_callers if defsyms.get(n) is not None}
+    print("  info     %d function(s) reach isTolino() by tail call: %s" % (
+        len(tail_callers), ", ".join(sorted(n or "?" for n in tail_callers)) or "none"))
+    md = Cs(CS_ARCH_ARM, CS_MODE_THUMB)
+    for gate in gates:
+        addr = defsyms.get(gate)
+        if addr is None:
+            print("  MISS     %s" % gate[:70])
+            errors += 1
+            continue
+        # Same bounds as the hook at runtime: [st_value, st_value + st_size).
+        st_value, st_size = fw.dynamic_symbols().get(gate, (addr, 0))
+        if st_size == 0:
+            print("  MISMATCH %-58s no st_size in .dynsym (hook cannot bound it)" % gate[:58])
+            errors += 1
+            continue
+        next_addr = st_value + st_size
+        calls, tails, bad = 0, 0, []
+        for ins in md.disasm(fw.read(addr, next_addr - addr), addr):
+            if ins.mnemonic not in ("bl", "blx", "b.w") or not ins.op_str.startswith("#"):
+                continue
+            t = int(ins.op_str[1:], 16)
+            if t in tol_entries:
+                if ins.mnemonic == "b.w":
+                    tails += 1
+                else:
+                    calls += 1
+            elif t in tail_entries or (t & ~1) in tail_entries:
+                bad.append(plt.get(t) or names.get(t & ~1) or hex(t))
+        ok = calls > 0 and tails == 0 and not bad
+        if not ok:
+            errors += 1
+        print("  %-8s %-50s size=0x%x isTolino calls=%d tail=%d%s" % (
+            "OK" if ok else "MISMATCH", gate[:50], st_size, calls, tails,
+            (" calls tail-callers: " + ", ".join(bad)) if bad else ""))
+    return errors
+
+
 # Struct offsets the hook hard-codes, verified against the instruction that
 # computes them inside a firmware function:
 #   source constant -> (function symbol, regex on the op_str of its add)
@@ -475,6 +661,10 @@ def main():
 
     print("\n=== virtual calls in mirrored originals ===")
     errors += check_virtual_calls(defsyms, fw, addrs)
+
+    print("\n=== isTolino() gates (caller-scoped override) ===")
+    errors += check_tolino_gates(open(args.source, encoding="utf-8").read(),
+                                 defsyms, fw, addrs)
 
     print("\n=== hard-coded struct offsets ===")
     errors += check_offsets(open(args.source, encoding="utf-8").read(),

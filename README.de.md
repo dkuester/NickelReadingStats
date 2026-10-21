@@ -35,6 +35,7 @@ Das Mod hookt:
 | `EventEngine::fireEvent()` | `_ZN11EventEngine9fireEventEPKcRK6Vol…` | Seitenumbruch-Einstieg auf Tolino ausführen |
 | `EventEngine::fireEventSlot()` | `_ZN11EventEngine13fireEventSlotE10QByt…` | Seitenumbrüche/Events auf Tolino erfassen (Seiten pro Minute) |
 | `EventEngine::fireAnalyticsEvent()` | `_ZN11EventEngine18fireAnalyticsEvent…` | verwirft Analytics-Ereignisse auf dem Tolino (siehe „Datenschutz“) |
+| `GoogleAnalyticsRequester::apiRequest/sendRequest/loadQueue()` | `_ZN24GoogleAnalyticsRequester…` | legt Kobos Google Analytics auf dem Tolino still (siehe „Datenschutz“) |
 | `ReadingView::supportsReadingStats()` | `_ZNK11ReadingView20supportsReadingStatsEv` | Statistik für normale EPUBs zulassen |
 | `ReadingView::updateWordCounts()` | `_ZN11ReadingView16updateWordCountsEv` | Wortzählung für normale EPUBs nachrüsten (siehe unten) |
 | `ReadingView::mergedTOCAndSpineIndex()` | `_ZN11ReadingView22mergedTOCAndSpineIndexEv` | Rohen Spine-Index verwenden, damit gelesene Kapitel hervorgehoben werden |
@@ -43,13 +44,18 @@ Das Mod hookt:
 Die drei Kennzahlen „Stunden gelesen", „Minuten pro Sitzung" und „Seiten pro
 Minute" speist die Lesesitzungs-Erfassung (`startReadingSession`/
 `endReadingSession`). Die prüfen intern `isTolino()` und überspringen auf dem
-Tolino die komplette Kobo-Erfassung. Der Hook führt sie mit einem
-thread-lokalen `g_force_kobo_session`-Flag aus, das `isTolino()` nur im
-aufrufenden Thread und nur während dieser Aufrufe `false` liefern lässt.
-Andere Threads und aller Code außerhalb dieser Aufrufe (Tolino-Shop/-Cloud/
--DRM) sehen weiter den echten Wert. Einschränkung: Das Fenster umfasst alles,
-was diese Aufrufe synchron ausführen, auch direkt verbundene Slots von
-Signalen, die sie auslösen.
+Tolino die komplette Kobo-Erfassung. Während der Hook sie ausführt, liefert
+`isTolino()` nur dann `false`, wenn drei Bedingungen zugleich gelten: im
+aufrufenden Thread (thread-lokales Flag), nur für die Dauer dieser Aufrufe und
+nur, wenn es **direkt aus einer der Sperrfunktionen** aufgerufen wird
+(`startReadingSession`, `endReadingSession`, `fireEvent`, `fireEventSlot`,
+`initialize`), erkannt an der Rücksprungadresse. Alles andere sieht den
+echten Wert: andere Threads, Tolino-Shop/-Cloud/-DRM und auch alles, was die
+Sperrfunktionen weiter aufrufen. Auf 5.18 gehört dazu die
+Affiliate-Ermittlung (Thalia vs. Kobo) und die Wörterbuchliste unterhalb von
+`EventEngine::initialize()`. `tools/check-symbols.py` prüft, dass jede Sperrfunktion
+`isTolino()` selbst aufruft und keine eine Funktion aufruft, die es per
+Tail-Call erreicht.
 
 Seitenumbrüche werden separat erfasst: `ReadingView::onPageTurned()` ruft
 `EventEngine::fireEvent()` auf, das `EventEngine::fireEventSlot()` einplant.
@@ -84,6 +90,16 @@ verwirft deshalb auf dem Tolino jedes Analytics-Ereignis, wie im
 Originalzustand; die Reading-Life-Daten für die Statistik liegen getrennt auf
 dem Gerät und sind nicht betroffen. Auf einem Kobo bleiben Analytics
 unverändert.
+
+Die Statistik braucht außerdem den Kobo-Zweig von `EventEngine::initialize()`,
+und der erzeugt Kobos Google-Analytics-Requester. Dessen Einträge
+(Leseereignisse, Bildschirme, Akku, Buch-IDs) laufen nicht über
+`fireAnalyticsEvent()`, sondern werden in `.kobo/Kobo/Analytics.conf`
+eingereiht und an `ssl.google-analytics.com` gesendet. Auf dem Tolino legt der
+Mod den Requester komplett still: keine neuen Einträge, kein Upload, und die
+Warteschlange wird beim Start nicht geladen, sodass das nächste Speichern sie
+leert. Damit verschwinden auch Einträge aus v0.2.0 und früher, sofern sie
+noch nicht übertragen wurden.
 
 ## Wortzählung für normale EPUBs
 

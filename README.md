@@ -34,6 +34,7 @@ The mod hooks:
 | `EventEngine::fireEvent()` | `_ZN11EventEngine9fireEventEPKcRK6Vol…` | Run the page-turn event entry on Tolino |
 | `EventEngine::fireEventSlot()` | `_ZN11EventEngine13fireEventSlotE10QByt…` | Record page turns/events on Tolino (pages per minute) |
 | `EventEngine::fireAnalyticsEvent()` | `_ZN11EventEngine18fireAnalyticsEvent…` | Drop analytics events on Tolino (see "Privacy") |
+| `GoogleAnalyticsRequester::apiRequest/sendRequest/loadQueue()` | `_ZN24GoogleAnalyticsRequester…` | Silence Kobo's Google Analytics on Tolino (see "Privacy") |
 | `ReadingView::supportsReadingStats()` | `_ZNK11ReadingView20supportsReadingStatsEv` | Allow stats for regular EPUBs |
 | `ReadingView::updateWordCounts()` | `_ZN11ReadingView16updateWordCountsEv` | Retrofit word counting for regular EPUBs (see below) |
 | `ReadingView::mergedTOCAndSpineIndex()` | `_ZN11ReadingView22mergedTOCAndSpineIndexEv` | Use the raw spine index so read chapters are highlighted |
@@ -42,12 +43,17 @@ The mod hooks:
 The three metrics "hours read", "minutes per session" and "pages per minute"
 are fed by the reading-session tracking (`startReadingSession`/
 `endReadingSession`). Those check `isTolino()` internally and skip the entire
-Kobo recording on a Tolino. The hook runs them with a thread-local
-`g_force_kobo_session` flag that makes `isTolino()` return `false` only on the
-calling thread and only while those calls run. Other threads, and all code
-outside these calls (Tolino store/cloud/DRM), keep the real value. Caveat: the
-window covers everything those calls do synchronously, including directly
-connected slots of signals they emit.
+Kobo recording on a Tolino. While the hook runs them, `isTolino()` returns
+`false` under three conditions at once: on the calling thread only
+(thread-local flag), only for the duration of those calls, and only when it
+is called **directly from one of the gate functions** (`startReadingSession`,
+`endReadingSession`, `fireEvent`, `fireEventSlot`, `initialize`), recognised by
+the return address. Everything else keeps the real value: other threads, the
+Tolino store/cloud/DRM, and also everything the gates call further down. On
+5.18 that includes the affiliate lookup (Thalia vs. Kobo) and the dictionary
+list below `EventEngine::initialize()`.
+`tools/check-symbols.py` verifies that each gate calls `isTolino()` itself and
+that none calls a function reaching it by a tail call.
 
 Page turns are recorded separately: `ReadingView::onPageTurned()` calls
 `EventEngine::fireEvent()`, which schedules `EventEngine::fireEventSlot()`.
@@ -79,6 +85,15 @@ hook on `EventEngine::fireAnalyticsEvent()` therefore drops every analytics
 event on a Tolino, matching the stock behaviour; the reading-life data that
 feeds the stats is stored separately on the device and is unaffected. On a
 Kobo, analytics are left alone.
+
+The stats also need `EventEngine::initialize()` to take its Kobo branch, and
+that branch creates Kobo's Google Analytics requester. Its hits (reading
+events, screens, battery, book IDs) bypass `fireAnalyticsEvent()`: they are
+queued in `.kobo/Kobo/Analytics.conf` and sent to `ssl.google-analytics.com`.
+On a Tolino the mod silences the requester completely: no new hit, no upload,
+and the queue is not restored at startup, so the next save empties it. This
+also removes hits queued by v0.2.0 and earlier, as long as they have not been
+uploaded yet.
 
 ## Word counting for regular EPUBs
 

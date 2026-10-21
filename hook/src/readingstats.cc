@@ -27,9 +27,11 @@
  *   - (2) re-run supportsActivityInMore() without its isTolino() early-out
  *     (device-class and parental-control guards kept, fail closed)
  *   - (3) run the EventEngine calls with isTolino() reporting false on the
- *     calling thread only, for the duration of the call (ForceKoboScope)
- *     and drop analytics events on a Tolino (stock Tolino queues none; the
- *     opened Kobo paths would upload title, author and reading time)
+ *     calling thread only, for the duration of the call (ForceKoboScope),
+ *     and only to the gate functions themselves, not to what they call
+ *     and drop analytics events and Google Analytics hits on a Tolino
+ *     (stock Tolino creates none; the opened Kobo paths would upload title,
+ *     author, book ID and reading time)
  *   - (4) mirror the original supportsReadingStats() for plain epubs: same
  *     accessibility, image-only and fixed-layout guards, kepub check swapped
  *     for epub. hasValidReadingStats() is NOT hooked: it calls
@@ -57,6 +59,13 @@
 #include <QPointer>
 #include <QString>
 #include <QThreadPool>
+
+#include <atomic>
+#include <cstdint>
+#include <dlfcn.h>
+#if defined(__GLIBC__)
+#include <link.h>  // ElfW, RTLD_DL_SYMENT for dladdr1()
+#endif
 
 #include "wordcount.h"
 
@@ -89,6 +98,13 @@ static void (*EventEngine__fireEventSlot)(void *, void *, void *, void *);
 // attributes, and a bool passed on the stack (read by `ldrb [sp, #0xd0]` in
 // its 5.18 prologue). Returns void.
 static void (*EventEngine__fireAnalyticsEvent)(void *, Device *, void *, void *, bool);
+// GoogleAnalyticsRequester (member functions, all void on 5.18):
+// apiRequest(QUrlQuery const&, bool) takes every new GA/GA4 hit from
+// GoogleAnalyticsHandler, sendRequest(QUrl const&) uploads one queued hit,
+// loadQueue(QSettings&) restores the persisted queue (Analytics.conf).
+static void (*GoogleAnalyticsRequester__apiRequest)(void *, const void *, bool);
+static void (*GoogleAnalyticsRequester__sendRequest)(void *, const void *);
+static void (*GoogleAnalyticsRequester__loadQueue)(void *, void *);
 
 // Resolved via dlsym.
 static bool (*ReadingView__isFixedLayout)(ReadingView *);
@@ -107,13 +123,88 @@ static bool       (*ReadingView__hasOnlyImages)(ReadingView *);
 // target firmware. A wrong offset hands getMimeType() a bogus `this`.
 static constexpr unsigned kReadingViewContentOffset = 0x94;
 
-// While set, isTolino() reports false so the reading-life tracking runs its
-// Kobo path on a Tolino. Set only by ForceKoboScope around the EventEngine
+// While set, isTolino() may report false so the reading-life tracking runs
+// its Kobo path on a Tolino. Set only by ForceKoboScope around the EventEngine
 // calls below. thread_local: other threads (sync, store, DRM) asking
-// isTolino() at the same moment keep getting the real answer. Note the
-// window still covers everything those calls run synchronously on this
-// thread, e.g. directly connected slots of signals they emit.
+// isTolino() at the same moment keep getting the real answer.
 static thread_local bool g_force_kobo_session = false;
+
+// The window alone is too wide: everything the EventEngine calls run
+// synchronously would see "not Tolino" too, e.g. Affiliate::
+// getDeviceAffiliate() (Thalia vs. Kobo) and DictionaryFileManager::getAll()
+// below EventEngine::initialize() (REVIEW-TODO N7). So the override only
+// applies when isTolino() is called directly from one of these gate
+// functions; every other caller, also inside the window, gets the real
+// answer. tools/check-symbols.py verifies that each gate calls isTolino()
+// itself (blx through the PLT, no tail call).
+//
+// initialize() is a gate too: fireEventSlot() calls it on every event and
+// needs it to report "initialised", which it only does on its non-Tolino
+// branch (5.18: `if (isTolino()) return false;`). That branch also sets up
+// Kobo's Google Analytics handler; its events go through fireAnalyticsEvent()
+// and are dropped on a Tolino (on-device: Analytics.conf queue stays empty).
+static const char *const kTolinoGateSymbols[] = {
+    "_ZN11EventEngine19startReadingSessionER6VolumeRK11PluginState4QMapI7QString8QVariantE",
+    "_ZN11EventEngine17endReadingSessionER6VolumeRK11PluginState4QMapI7QString8QVariantE",
+    "_ZN11EventEngine9fireEventEPKcRK6VolumeRK4QMapI7QString8QVariantE",
+    "_ZN11EventEngine13fireEventSlotE10QByteArray6Volume4QMapI7QString8QVariantE",
+    "_ZN11EventEngine10initializeEv",
+};
+static constexpr int kTolinoGateCount = sizeof(kTolinoGateSymbols) / sizeof(kTolinoGateSymbols[0]);
+
+// [begin, end) of each gate's code, from its dynamic symbol (st_value,
+// st_size), filled once by readingstats_init(). Left empty if a gate cannot be
+// resolved: then it never sees "not Tolino" (that stat stops, nothing leaks).
+struct CodeRange {
+    uintptr_t begin;
+    uintptr_t end;
+};
+static CodeRange g_tolino_gates[kTolinoGateCount];
+
+static bool resolve_code_range(const char *symbol, CodeRange *out) {
+#if defined(__GLIBC__)
+    void *addr = dlsym(RTLD_DEFAULT, symbol);
+    Dl_info info;
+    void *extra = nullptr;
+    if (!addr || !dladdr1(addr, &info, &extra, RTLD_DL_SYMENT) || !extra) {
+        return false;
+    }
+    const ElfW(Sym) *sym = static_cast<const ElfW(Sym) *>(extra);
+    if (sym->st_size == 0) {
+        return false;
+    }
+    const uintptr_t begin = reinterpret_cast<uintptr_t>(addr) & ~uintptr_t(1);  // Thumb bit
+    *out = CodeRange{begin, begin + sym->st_size};
+    return true;
+#else
+    (void)symbol;
+    (void)out;
+    return false;  // host builds (tests set g_tolino_gates directly)
+#endif
+}
+
+// True if `return_address` lies inside one of the gate functions.
+static bool called_from_tolino_gate(uintptr_t return_address) {
+    const uintptr_t pc = return_address & ~uintptr_t(1);
+    for (const CodeRange &r : g_tolino_gates) {
+        if (r.begin <= pc && pc < r.end) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// The device's real isTolino() answer, recorded by the isTolino() hook the
+// first time Nickel asks (early at boot): -1 unknown, 0 Kobo, 1 Tolino. Used
+// where no Device is at hand (the Google Analytics requester).
+static std::atomic<int> g_real_is_tolino{-1};
+
+// Kobo's analytics must not run on a Tolino; while the answer is unknown,
+// treat the device as a Tolino (fail closed: at worst a Kobo loses a few
+// boot-time analytics hits).
+static bool suppress_kobo_analytics() {
+    return g_real_is_tolino.load(std::memory_order_relaxed) != 0;
+}
 
 // Sets g_force_kobo_session for one scope and restores the previous value
 // on exit, so nested calls (fireEventSlot inside a session call) are safe.
@@ -232,6 +323,30 @@ static struct nh_hook NickelReadingStatsHook[] = {
         .desc    = "Drop analytics events on Tolino (stock Tolino queues none)",
         .optional = true,
     },
+    {
+        .sym     = "_ZN24GoogleAnalyticsRequester10apiRequestERK9QUrlQueryb",
+        .sym_new = "_nh_GoogleAnalyticsRequester__apiRequest",
+        .lib     = "libnickel.so.1.0.0",
+        .out     = nh_symoutptr(GoogleAnalyticsRequester__apiRequest),
+        .desc    = "Drop Google Analytics hits on Tolino (stock Tolino creates none)",
+        .optional = true,
+    },
+    {
+        .sym     = "_ZN24GoogleAnalyticsRequester11sendRequestERK4QUrl",
+        .sym_new = "_nh_GoogleAnalyticsRequester__sendRequest",
+        .lib     = "libnickel.so.1.0.0",
+        .out     = nh_symoutptr(GoogleAnalyticsRequester__sendRequest),
+        .desc    = "Never upload queued Google Analytics hits on Tolino",
+        .optional = true,
+    },
+    {
+        .sym     = "_ZN24GoogleAnalyticsRequester9loadQueueER9QSettings",
+        .sym_new = "_nh_GoogleAnalyticsRequester__loadQueue",
+        .lib     = "libnickel.so.1.0.0",
+        .out     = nh_symoutptr(GoogleAnalyticsRequester__loadQueue),
+        .desc    = "Do not restore a Google Analytics queue on Tolino (clears it on save)",
+        .optional = true,
+    },
     {0},
 };
 
@@ -339,12 +454,16 @@ _nh_Device__supportsReadingLife(Device *device) {
     return true;
 }
 
-// Only deviate from the real isTolino() while a reading session is being
-// tracked. Everywhere else the original value is returned, so the Tolino
-// store/cloud/DRM behaviour is untouched.
-extern "C" __attribute__((visibility("default"))) bool
+// Only deviate from the real isTolino() inside the ForceKoboScope window AND
+// when the direct caller is one of the gate functions. Everywhere else the
+// original value is returned, so Tolino store/cloud/DRM/affiliate code and
+// anything the gates call further down keep their behaviour.
+// __builtin_return_address(0) must be read here, in the hook itself: the
+// gate reaches it through the PLT/GOT jump, so LR still points into the gate.
+extern "C" __attribute__((visibility("default"), noinline)) bool
 _nh_Device__isTolino(Device *device) {
-    if (g_force_kobo_session) {
+    if (g_force_kobo_session &&
+        called_from_tolino_gate(reinterpret_cast<uintptr_t>(__builtin_return_address(0)))) {
         return false;
     }
     // NickelHook sets .out before installing the hook, so this cannot be NULL
@@ -352,7 +471,9 @@ _nh_Device__isTolino(Device *device) {
     if (!Device__isTolino) {
         return true;
     }
-    return Device__isTolino(device);
+    const bool tolino = Device__isTolino(device);
+    g_real_is_tolino.store(tolino ? 1 : 0, std::memory_order_relaxed);
+    return tolino;
 }
 
 // startReadingSession/endReadingSession call isTolino() themselves and skip
@@ -430,6 +551,39 @@ _nh_EventEngine__fireAnalyticsEvent(void *engine, Device *device, void *name, vo
         return;
     }
     EventEngine__fireAnalyticsEvent(engine, device, name, attrs, flag);
+}
+
+// Google Analytics: EventEngine::initialize() has to take its non-Tolino
+// branch for the stats to work (see kTolinoGateSymbols), and that branch also
+// creates Kobo's GoogleAnalyticsHandler. Its hits do not go through
+// fireAnalyticsEvent(): they are queued in Analytics.conf and uploaded to
+// ssl.google-analytics.com. Measured on Tolino 5.18 (REVIEW-TODO N8): 52 hits
+// queued, incl. OpenContent/LeaveContent with book_id. A stock Tolino never
+// creates the handler, so on a Tolino the requester is silenced at all three
+// points: no new hit, no upload, no restored queue (the next save writes an
+// empty one, which removes hits queued by earlier versions of this mod).
+extern "C" __attribute__((visibility("default"))) void
+_nh_GoogleAnalyticsRequester__apiRequest(void *self, const void *query, bool flag) {
+    if (suppress_kobo_analytics() || !GoogleAnalyticsRequester__apiRequest) {
+        return;
+    }
+    GoogleAnalyticsRequester__apiRequest(self, query, flag);
+}
+
+extern "C" __attribute__((visibility("default"))) void
+_nh_GoogleAnalyticsRequester__sendRequest(void *self, const void *url) {
+    if (suppress_kobo_analytics() || !GoogleAnalyticsRequester__sendRequest) {
+        return;
+    }
+    GoogleAnalyticsRequester__sendRequest(self, url);
+}
+
+extern "C" __attribute__((visibility("default"))) void
+_nh_GoogleAnalyticsRequester__loadQueue(void *self, void *settings) {
+    if (suppress_kobo_analytics() || !GoogleAnalyticsRequester__loadQueue) {
+        return;
+    }
+    GoogleAnalyticsRequester__loadQueue(self, settings);
 }
 
 // Device::supportsActivityInMore() gates the "Activity" entry in the More
@@ -618,8 +772,19 @@ _nh_FeatureSettings__bookSpecificStatsEnabled(FeatureSettings *settings) {
     return true;
 }
 
+// Runs after the hooks are installed. Never fails: a gate that cannot be
+// resolved only loses its stats (see g_tolino_gates).
+static int readingstats_init() {
+    for (int i = 0; i < kTolinoGateCount; ++i) {
+        if (!resolve_code_range(kTolinoGateSymbols[i], &g_tolino_gates[i])) {
+            nh_log("could not resolve gate %s; it keeps the Tolino path", kTolinoGateSymbols[i]);
+        }
+    }
+    return 0;
+}
+
 NickelHook(
-    .init  = nullptr,
+    .init  = readingstats_init,
     .info  = &NickelReadingStats,
     .hook  = NickelReadingStatsHook,
     .dlsym = NickelReadingStatsDlsym,

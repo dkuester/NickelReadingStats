@@ -185,6 +185,57 @@ Aufgaben:
   Buch erneut geöffnet → `Event 46` 87 → 112 (+25), „Seiten pro Minute“ zeigt
   1,1. Kein Fehler im Mod.*
 
+- [x] **N7** Testerbericht (2026-10-20, Tolino Vision Color, Version v0.1.0):
+  Nach Installation wurde der Tolino „zur Mischung aus Kobo und Tolino“:
+  Kobo-Menüs sichtbar, Thalia-Konto weg (nur Kobo-Konto), Sync defekt;
+  ohne Mod wieder normal, reproduzierbar. *Ursache sehr wahrscheinlich H2
+  (globaler `isTolino()`-Override in v0.1.0, u. a. beim `AppStart` während der
+  Konto-/Sync-Initialisierung). Gegenprobe auf eigenem Tolino mit aktuellem
+  Stand: Sync und Downloads ok, keine Kobo-Menüs; mit v0.1.0 am 19.10.
+  `FailedSync`. Behoben in v0.2.0 (Release 2026-10-20). Restrisiko: Im selben
+  Thread sieht weiterhin alles, was die Sperrfunktionen synchron aufrufen,
+  „kein Tolino“. → Branch `fix/istolino-caller-scope`:*
+  1. Per Firmware-Analyse alle Aufrufer von `isTolino()` in der Kette
+     `start/endReadingSession`, `fireEvent`, `fireEventSlot`,
+     `fireSocialEvent` und deren Callees ermitteln (Liste der Sperrfunktionen).
+  2. Prüfen, dass keine davon `isTolino()` per Tail-Call erreicht.
+  3. Hook: `false` nur, wenn das Fenster aktiv ist **und** der direkte
+     Aufrufer (Rücksprungadresse, Adressbereiche beim Start per `dladdr`/
+     Symbolen bestimmt) eine Sperrfunktion ist; sonst echter Wert.
+  4. `check-symbols.py`: Liste der Sperrfunktionen gegen die Firmware prüfen
+     (rufen `isTolino()` über PLT, kein Tail-Call).
+  5. Host-Test, ARM-Build, Gerätetest: alle drei Activity-Kennzahlen,
+     Buchstatistik, Sync, Konto, Menüs.
+  Testerrückmeldung zu v0.2.0 steht aus.
+  *Stand 2026-10-20 (Branch): Schritte 1–4 umgesetzt. Analyse 5.18: von den
+  Sperrfunktionen aus (direkte/PLT-Aufrufe, 6 Ebenen) fragen außerdem
+  `EventEngine::initialize()` (richtet Google Analytics und `SessionStats`
+  ein), `Affiliate::getDeviceAffiliate()` (Thalia/Kobo, nur gelesen, nicht
+  gespeichert) und `DictionaryFileManager::getAll()` `isTolino()` ab – alle
+  analytics-bezogen, alle sehen jetzt den echten Wert. Einziger Tail-Caller
+  von `isTolino()`: `ApplicationSettings::tolinoDemoModeEnabled()`, von keiner
+  Sperrfunktion aufgerufen. Bereiche zur Laufzeit aus `.dynsym`
+  (`dladdr1`, st_size); `check-symbols.py` prüft mit denselben Grenzen.
+  Gerätetest 2026-10-21 (Tolino 5.18.264769): zuerst fehlte `initialize()`
+  als Sperrfunktion (Statistik eingefroren, per Diagnose-Log gefunden); mit
+  fünf Sperrfunktionen zählen Sitzungen und Seitenwechsel wieder, Thalia-
+  Konto, Sync und Downloads ok, keine Kobo-Menüs.*
+
+- [x] **N8** Google Analytics über `initialize()` (2026-10-21). *Gerätetest des
+  engeren Overrides: Statistik ok (Seitenwechsel 112 → 122, Sitzungen +2),
+  aber `.kobo/Kobo/Analytics.conf` enthielt 52 GA-Hits an
+  `ssl.google-analytics.com` (u. a. OpenContent/LeaveContent, 5× `book_id`,
+  Akku, Schriftart). Ursache: `initialize()` muss den Kobo-Zweig nehmen
+  (sonst keine Statistik), und der erzeugt `GoogleAnalyticsHandler`; dessen
+  Hits laufen an `fireAnalyticsEvent()` vorbei. **Betrifft auch v0.2.0 und
+  v0.1.0**; bei N4/N5 wurde nur die DB-Tabelle geprüft. Gegenmaßnahme auf
+  `fix/istolino-caller-scope`: `GoogleAnalyticsRequester::apiRequest`,
+  `sendRequest`, `loadQueue` auf dem Tolino stilllegen (echter `isTolino()`-
+  Wert, unbekannt = stilllegen). Gerätetest 2026-10-21: Warteschlange von 52
+  auf 0 geleert (WLAN aus, also nicht gesendet), bleibt auch mit WLAN und
+  Sync leer; Statistik zählt weiter (Seitenwechsel 122 → 139). Offen:
+  Hotfix-Release v0.2.1.*
+
 Geräte-Auswertung N1 (2026-10-19): Aus der Datenbank nicht entscheidbar, weil
 die Kapitel-Wortzahlen nur im Speicher liegen (`ReadingView+0xa4`). Seit H3 hat
 die Liste genau so viele Einträge wie die Spine, und `chapterIndex()` liegt
@@ -220,3 +271,7 @@ für sideloaded EPUBs (14 Sitzungen, 3017 s, Start/Ende paarweise).
 - 2026-10-20: N5 auf dem Gerät bestätigt (keine Analytics, Statistik läuft). N6 aufgenommen.
 - 2026-10-20: N1 erledigt (Override entfernt), N6 analysiert (vermutlich kein Fehler, Gerätetest offen). Branch fix/page-turns-valid-stats.
 - 2026-10-20: Gerätetest N1/N6 bestanden (Statistikseite ok, Seitenwechsel +25, 1,1 Seiten/min, Analytics leer).
+- 2026-10-20: Release v0.2.0 (Tag auf cdcaa94, Asset SHA-256 f36cb4fc…). N7 (Testerbericht) aufgenommen; Branch fix/istolino-caller-scope für den engeren Override.
+- 2026-10-20: N7 Schritte 1–4 auf fix/istolino-caller-scope umgesetzt; Gerätetest offen.
+- 2026-10-21: Gerätetest N7 ok (initialize als Sperrfunktion). N8: GA-Hits entdeckt, Requester-Hooks umgesetzt; Diagnose-Commit zurückgenommen.
+- 2026-10-21: Gerätetest N8 ok (GA-Warteschlange leer, auch mit WLAN). PR für fix/istolino-caller-scope.
