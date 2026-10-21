@@ -1,248 +1,168 @@
 # NickelReadingStats
 
-> English: [README.md](README.md)
+**Kobos Lesestatistik auf dem Tolino, auch für eigene EPUBs.**
 
-NickelHook-Mod für Tolino-Firmware 5.18+ (Qt 6.5.2), der die
-Kobo-„Reading Stats" (Lesestatistik) wiederherstellt und für normale
-(sideloaded) EPUBs freischaltet.
+[![Release](https://img.shields.io/gitea/v/release/hortizept/nickel-reading-stats?gitea_url=https%3A%2F%2Fcodeberg.org&label=release)](https://codeberg.org/hortizept/nickel-reading-stats/releases)
+[![CI](https://codeberg.org/hortizept/nickel-reading-stats/badges/workflows/ci.yml/badge.svg?branch=main)](https://codeberg.org/hortizept/nickel-reading-stats/actions?workflow=ci.yml)
+[![Firmware](https://img.shields.io/badge/firmware-5.18%2B%20(Qt%206)-informational)](#kompatibilität)
+[![Lizenz](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
-## Was das Mod tut
+[Installation](#installation) · [Funktionen](#funktionen) · [Datenschutz](#datenschutz) · [Funktionsweise](docs/ARCHITECTURE.md) · [Entwicklung](docs/DEVELOPMENT.md) · [Releases](https://codeberg.org/hortizept/nickel-reading-stats/releases) · [English](README.md)
 
-Auf einem Tolino ist die Lesestatistik durch zwei unabhängige Gatter in
-`libnickel.so.1.0.0` deaktiviert:
+Tolino-Reader laufen mit derselben Software wie Kobo-Geräte, doch Kobos
+„Lesestatistik“ ist auf ihnen abgeschaltet und funktioniert selbst auf einem
+Kobo nur für kepub-Dateien. NickelReadingStats ist ein
+[NickelHook](https://github.com/pgaskin/NickelHook)-Mod, der sie wieder
+einschaltet, auf normale EPUBs erweitert und dabei dafür sorgt, dass dein
+Tolino ein Tolino bleibt: Shop, Cloud, DRM und Datenschutz verhalten sich wie
+bisher.
 
-1. `Device::supportsReadingLife()` liefert `!Device::isTolino()` zurück.
-   Auf einem Tolino also immer `false` — die komplette Reading-Life-/
-   Statistik-UI („Reading stats"-Seite, Statistik-Tab im Lesemenü) wird nie
-   angeboten. Das ist der Unterschied „Kobo-Modus vs. Tolino-Modus".
+> [!IMPORTANT]
+> **Noch auf v0.1.0 oder v0.2.0? Bitte auf [v0.2.1](https://codeberg.org/hortizept/nickel-reading-stats/releases/tag/v0.2.1) aktualisieren.**
+> In diesen Versionen lief auf dem Tolino Kobos Analytics-Erfassung mit, und
+> Leseereignisse konnten an Google übertragen werden. v0.2.1 unterbindet das
+> und löscht noch nicht gesendete Einträge. Siehe [Datenschutz](#datenschutz).
 
-2. `ReadingView::supportsReadingStats()` verlangt den MIME-Typ
-   `application/x-kobo-epub+zip` (kepub). Sideloaded EPUBs
-   (`application/epub+zip`) bekommen daher auch auf einem echten Kobo keine
-   Statistik. `hasValidReadingStats()` verlangt auf dem Tolino zusätzlich
-   Wortzahlen pro Kapitel und einen merged-TOC/Spine-Index innerhalb dieser
-   Liste, die normale EPUBs nicht besitzen.
+---
 
-Das Mod hookt:
+## Funktionen
 
-| Hook | Symbol | Wirkung |
-|---|---|---|
-| `Device::supportsReadingLife()` | `_ZNK6Device19supportsReadingLifeEv` | Feature auf Tolino wieder aktivieren |
-| `Device::supportsActivityInMore()` | `_ZNK6Device22supportsActivityInMoreEv` | „Aktivität"-Eintrag im Mehr-Menü auf Tolino anzeigen |
-| `Device::isTolino()` | `_ZNK6Device8isTolinoEv` | meldet nur während der Session-Erfassung „kein Tolino" (siehe unten) |
-| `EventEngine::startReadingSession()` | `_ZN11EventEngine19startReadingSessionE…` | Kobo-Session-Start auf Tolino ausführen |
-| `EventEngine::endReadingSession()` | `_ZN11EventEngine17endReadingSessionE…` | Kobo-Session-Ende auf Tolino ausführen |
-| `EventEngine::fireEvent()` | `_ZN11EventEngine9fireEventEPKcRK6Vol…` | Seitenumbruch-Einstieg auf Tolino ausführen |
-| `EventEngine::fireEventSlot()` | `_ZN11EventEngine13fireEventSlotE10QByt…` | Seitenumbrüche/Events auf Tolino erfassen (Seiten pro Minute) |
-| `EventEngine::fireAnalyticsEvent()` | `_ZN11EventEngine18fireAnalyticsEvent…` | verwirft Analytics-Ereignisse auf dem Tolino (siehe „Datenschutz“) |
-| `GoogleAnalyticsRequester::apiRequest/sendRequest/loadQueue()` | `_ZN24GoogleAnalyticsRequester…` | legt Kobos Google Analytics auf dem Tolino still (siehe „Datenschutz“) |
-| `ReadingView::supportsReadingStats()` | `_ZNK11ReadingView20supportsReadingStatsEv` | Statistik für normale EPUBs zulassen |
-| `ReadingView::updateWordCounts()` | `_ZN11ReadingView16updateWordCountsEv` | Wortzählung für normale EPUBs nachrüsten (siehe unten) |
-| `ReadingView::mergedTOCAndSpineIndex()` | `_ZN11ReadingView22mergedTOCAndSpineIndexEv` | Rohen Spine-Index verwenden, damit gelesene Kapitel hervorgehoben werden |
-| `FeatureSettings::bookSpecificStatsEnabled()` | `_ZN15FeatureSettings24bookSpecificStatsEnabledEv` | Per-Book-Statistik forcieren |
+| Funktion | Beschreibung |
+|---|---|
+| **Buchstatistik** | Eigene Seite im Lesemenü mit Kapitelbalken. Gelesene Kapitel sind hervorgehoben, dazu gibt es Restzeit-Schätzungen. |
+| **Aktivität** | Eintrag „Aktivität“ im Mehr-Menü: Stunden gelesen, Minuten pro Sitzung, Seiten pro Minute. |
+| **Normale EPUBs** | Funktioniert für eigene EPUBs, nicht nur für kepubs. Die Wortzahlen werden im Hintergrund berechnet und pro Buch zwischengespeichert. |
+| **Tolino bleibt Tolino** | Kobo-Verhalten wird nur für die wenigen Funktionen freigegeben, die Lesezeit und Seitenwechsel aufzeichnen. Thalia-Konto (oder das eines anderen Buchhändlers), Sync und Downloads bleiben unberührt. |
+| **Datenschutz** | Kobos Analytics und Google Analytics sind auf dem Tolino stillgelegt. |
+| **Fehlertolerant** | Jeder Hook ist optional und fällt sauber weg: Passt etwas nicht zur Firmware, fehlt eine Statistik, nicht das gewohnte Verhalten deines Geräts. |
 
-Die drei Kennzahlen „Stunden gelesen", „Minuten pro Sitzung" und „Seiten pro
-Minute" speist die Lesesitzungs-Erfassung (`startReadingSession`/
-`endReadingSession`). Die prüfen intern `isTolino()` und überspringen auf dem
-Tolino die komplette Kobo-Erfassung. Während der Hook sie ausführt, liefert
-`isTolino()` nur dann `false`, wenn drei Bedingungen zugleich gelten: im
-aufrufenden Thread (thread-lokales Flag), nur für die Dauer dieser Aufrufe und
-nur, wenn es **direkt aus einer der Sperrfunktionen** aufgerufen wird
-(`startReadingSession`, `endReadingSession`, `fireEvent`, `fireEventSlot`,
-`initialize`), erkannt an der Rücksprungadresse. Alles andere sieht den
-echten Wert: andere Threads, Tolino-Shop/-Cloud/-DRM und auch alles, was die
-Sperrfunktionen weiter aufrufen. Auf 5.18 gehört dazu die
-Affiliate-Ermittlung (Thalia vs. Kobo) und die Wörterbuchliste unterhalb von
-`EventEngine::initialize()`. `tools/check-symbols.py` prüft, dass jede Sperrfunktion
-`isTolino()` selbst aufruft und keine eine Funktion aufruft, die es per
-Tail-Call erreicht.
+## Kompatibilität
 
-Seitenumbrüche werden separat erfasst: `ReadingView::onPageTurned()` ruft
-`EventEngine::fireEvent()` auf, das `EventEngine::fireEventSlot()` einplant.
-Beide prüfen `isTolino()` und brechen auf dem Tolino ab; der Hook führt beide
-mit demselben Flag aus, damit Seitenwechsel gezählt werden.
+| Gerät / Firmware | Status |
+|---|---|
+| Tolino, Firmware 5.18+ (Qt 6) | ✅ Getestet (5.18.264769) |
+| Kobo, Firmware 5.x (Qt 6) | ⚠️ Sollte funktionieren, noch nicht geprüft |
+| Kobo / Tolino, Firmware 4.x (Qt 5) | ❌ Nicht unterstützt |
 
-Wichtig: Der „Aktivität"-Eintrag hängt an `supportsActivityInMore()`, das auf
-Tolino wegen `isTolino()` sofort `false` liefert — unabhängig von
-`supportsReadingLife()`. Deshalb blieb der Eintrag zunächst versteckt. Der
-Hook führt die ursprüngliche Prüfung (`!isTolino() && deviceClass == 2 &&
-!ParentalControl`) erneut aus, lässt aber nur die `isTolino()`-Sperre weg;
-Geräteklasse und Jugendschutz bleiben erhalten.
+| Inhalt | Statistik |
+|---|---|
+| Eigenes EPUB (`.epub`) | ✅ Durch diesen Mod ergänzt |
+| kepub (`.kepub.epub`, Shop-Bücher) | ✅ Unverändert, wie von Nickel bereitgestellt |
+| Fixed-Layout-EPUB, reine Bilderbücher, PDF, Comics | ❌ Ausgeschlossen, wie es Nickel auch bei kepubs tut |
 
-Welche Bücher Stats bekommen: Die Hooks rufen zuerst die Originalfunktion
-auf und übernehmen ein `true`. Andernfalls wenden sie die Regel des
-Originals `supportsReadingStats()` an, bei der nur die kepub-Bedingung durch
-„normales EPUB“ (`application/epub+zip`) ersetzt ist: Der
-Accessibility-Status des Inhalts darf nicht 6 sein, das Buch darf nicht nur
-aus Bildern bestehen (`hasOnlyImages()`) und kein Fixed-Layout sein. Fixed-Layout-Inhalte (Fixed-Layout-EPUBs, PDF, Comics) und
-andere Formate bleiben ausgeschlossen; ein kepub, das Nickel ablehnt, bleibt
-abgelehnt.
+## Installation
+
+> [!TIP]
+> NickelMenu oder andere Mods sind nicht nötig. NickelReadingStats bringt sein
+> eigenes Hook-Framework mit.
+
+1. `Kobo.tgz` aus dem [neuesten Release](https://codeberg.org/hortizept/nickel-reading-stats/releases/latest) herunterladen.
+2. Das Gerät per USB verbinden und `Kobo.tgz` in den versteckten Ordner
+   `.kobo/` kopieren.
+3. Das Gerät auswerfen. Es spielt das Update beim nächsten Start ein; startet
+   es nicht von selbst neu, bitte neu starten.
+
+Ein eigenes EPUB öffnen und der Wortzählung einen Moment geben. Danach
+erscheint die Buchstatistik im Lesemenü und „Aktivität“ im Mehr-Menü.
+Gelesene Stunden und Seiten pro Minute füllen sich erst, nachdem du eine
+Weile gelesen hast.
+
+**Aktualisieren:** Das neuere `Kobo.tgz` genauso kopieren; vorher
+deinstallieren ist nicht nötig.
+
+**Deinstallieren:** Im Hauptverzeichnis des Geräts eine leere Datei namens
+`readingstats_uninstall` (ohne Dateiendung) anlegen und neu starten. Der Mod
+entfernt sich selbst, und das Gerät verhält sich wieder wie im
+Auslieferungszustand.
 
 ## Datenschutz
 
-Wer auf dem Tolino die Kobo-Reading-Life-Pfade öffnet, öffnet auch Kobos
-Analytics: Auf einem Tolino 5.18 gemessen, hat Nickel mit dem Mod Ereignisse
-wie `OpenContent`/`leave_content` mit Titel, Autor, ISBN und Lesezeit für
-sideloaded Bücher eingereiht, die beim nächsten Sync übertragen werden (sofern
-Analytics in den Datenschutz-Einstellungen erlaubt sind). Ohne Mod hat der
-Tolino keine eingereiht. Der Hook auf `EventEngine::fireAnalyticsEvent()`
-verwirft deshalb auf dem Tolino jedes Analytics-Ereignis, wie im
-Originalzustand; die Reading-Life-Daten für die Statistik liegen getrennt auf
-dem Gerät und sind nicht betroffen. Auf einem Kobo bleiben Analytics
-unverändert.
+Kobos Reading-Life-Code, den die Statistik braucht, enthält auch Kobos
+Analytics. Ein Tolino ohne Mod führt ihn nie aus. NickelReadingStats lässt den
+Statistik-Teil laufen und hält den Analytics-Teil auf dem Tolino still:
 
-Die Statistik braucht außerdem den Kobo-Zweig von `EventEngine::initialize()`,
-und der erzeugt Kobos Google-Analytics-Requester. Dessen Einträge
-(Leseereignisse, Bildschirme, Akku, Buch-IDs) laufen nicht über
-`fireAnalyticsEvent()`, sondern werden in `.kobo/Kobo/Analytics.conf`
-eingereiht und an `ssl.google-analytics.com` gesendet. Auf dem Tolino legt der
-Mod den Requester komplett still: keine neuen Einträge, kein Upload, und die
-Warteschlange wird beim Start nicht geladen, sodass das nächste Speichern sie
-leert. Damit verschwinden auch Einträge aus v0.2.0 und früher, sofern sie
-noch nicht übertragen wurden.
+| | Tolino ohne Mod | Mit NickelReadingStats 0.2.1 |
+|---|---|---|
+| Lesestatistik auf dem Gerät gespeichert | — | ✅ |
+| Analytics-Ereignisse (`KoboReader.sqlite`) | keine | keine (verworfen) |
+| Google-Analytics-Warteschlange (`.kobo/Kobo/Analytics.conf`) | keine | keine (stillgelegt, alte Einträge gelöscht) |
 
-## Wortzählung für normale EPUBs
+Die Statistik bleibt auf dem Gerät. Auf einem Kobo verhalten sich Analytics
+genau wie ohne Mod. Details (englisch):
+[Privacy internals](docs/ARCHITECTURE.md#privacy-internals).
 
-`ReadingView::updateWordCounts()` ist das kepub-only-Gatter, das die
-Wortzählung pro Kapitel erzeugt — die Grundlage für das Kapitel-Balkendiagramm
-und die „verbleibende Zeit"-Schätzung. Es kehrt für alles, was kein kepub ist,
-sofort um. Der Hook ruft zuerst die Originalfunktion auf (kepub und Instapaper
-laufen unverändert) und zählt danach für ein sideloaded EPUB die Wörter selbst:
+## Bekannte Einschränkungen
 
-1. MIME-Typ prüfen (`application/epub+zip`) und Fixed-Layout ausschließen.
-2. Den Dateipfad des EPUBs aus der Content-ID (`file://…`) ableiten.
-3. Das EPUB-Zip mit `QZipReader` öffnen, die OPF lokalisieren
-   (`META-INF/container.xml`, Fallback `*.opf`) und die Spine-Reihenfolge
-   parsen (Manifest + Spine).
-4. Pro Spine-Datei das XHTML lesen, Tags/Skripte/Styles entfernen und die
-   Wörter zählen.
-5. Die `QList<int>` über `ReadingView::gotWordCounts()` an Nickel liefern.
+- Die Restzeit-Schätzung kann zu niedrig ausfallen, bis Nickel deine
+  Lesegeschwindigkeit aus ein paar längeren Sitzungen gelernt hat.
+- Ein Buch, das aus einer einzigen großen HTML-Datei besteht, zeigt nur einen
+  Kapitelbalken.
+- Die Buchstatistik erscheint einen Moment nach dem Öffnen eines Buchs, sobald
+  die Wortzählung im Hintergrund fertig ist.
+- Kobo-Geräte mit Firmware 5.x sind noch nicht geprüft. Wer eines hat: Feedback
+  ist sehr willkommen.
 
-Schritte 3–4 laufen in einem einzelnen Hintergrund-Thread, wie Nickels eigener
-kepub-Wortzähler; das Öffnen eines Buchs blockiert die Oberfläche also nicht.
-Das Ergebnis wird im GUI-Thread ausgeliefert, und nur, wenn der View noch
-existiert und noch dasselbe Buch zeigt. Ergebnisse werden pro Datei gecacht
-(ungültig bei geänderter Größe oder mtime), und jeder ZIP-Eintrag ist auf 8 MB
-unkomprimiert begrenzt.
+## Funktionsweise
 
-Damit füllt sich auch bei normalen EPUBs das Kapitel-Balkendiagramm und die
-zeitbasierten Schätzungen werden plausibel. Randnotiz: Bücher, die aus einer
-einzigen großen HTML-Datei bestehen, ergeben genau einen Balken — das ist
-korrekt, keine leere Anzeige.
+Auf dem Tolino ist die Statistik hinter mehreren Abfragen von
+`Device::isTolino()` und einer kepub-only-Regel versteckt. Der Mod hookt diese
+Funktionen in `libnickel.so.1.0.0`, antwortet „kein Tolino“ nur den fünf
+Kobo-Reading-Life-Funktionen, die das brauchen, zählt die Wörter für normale
+EPUBs selbst und legt Kobos Analytics still. Die vollständige Beschreibung mit
+allen Hooks und dem Aufrufgraphen steht (englisch) in
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
-Ob die Statistikseite eines Buchs angeboten wird, entscheidet Nickels eigenes
-`hasValidReadingStats()`: Es braucht die Wortzahlen und ein aktuelles Kapitel
-innerhalb dieser Liste. Bei einem normalen EPUB ist das erfüllt, sobald die
-Zählung im Hintergrund geliefert hat (meist einen Moment nach dem Öffnen); ein
-Buch, bei dem die Zählung scheitert, bekommt keine Buchstatistik statt einer
-leeren oder verschobenen Ansicht.
+## Entwicklung
 
-## Grenzen („robust" heißt hier: sauber degradieren, nicht abstürzen)
+```sh
+git clone --recurse-submodules https://codeberg.org/hortizept/nickel-reading-stats.git
+cd nickel-reading-stats/hook
+docker run --rm --volume="$PWD:$PWD" --workdir="$PWD" strayrose/nickeltc make kobo
+make -C tests check            # Host-Unit-Tests
+```
 
-Alle Hooks und `dlsym`-Ziele sind optional: Fehlt einem 5.18+-Build ein
-Symbol, entfällt nur das Feature, das es braucht, nicht das ganze Mod
-(NickelHook protokolliert jedes nicht gefundene Symbol). Prüfungen, die sich
-nicht auswerten lassen, schlagen geschlossen fehl — keine Stats, kein
-Aktivität-Eintrag — statt offen. Bestehendes Verhalten (z. B. kepub auf Kobo)
-bleibt unverändert, weil immer zuerst die Originalfunktion läuft.
+Bauen, die Teststufen, die Firmware-Prüfungen für Symbole und ABI sowie die CI
+sind (englisch) in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) beschrieben.
 
-## Bauen
+## Support
 
-Voraussetzung: Docker-Image `strayrose/nickeltc:latest`
-(`arm-kobo-linux-gnueabihf`-Toolchain, Qt 6.5.2).
+| | |
+|---|---|
+| Fehlermeldungen und Fragen | [Issues](https://codeberg.org/hortizept/nickel-reading-stats/issues). Bitte Gerätemodell, Firmware-Version (`.kobo/version`) und Mod-Version angeben. |
+| Downloads und Änderungen | [Releases](https://codeberg.org/hortizept/nickel-reading-stats/releases) |
+| Mitwirken | Pull-Requests gegen `main`; die CI muss grün sein. Siehe [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md). |
 
-    cd hook
-    docker run --rm --volume="$PWD:$PWD" --workdir="$PWD" strayrose/nickeltc make
-    docker run --rm --volume="$PWD:$PWD" --workdir="$PWD" strayrose/nickeltc make kobo
+> [!WARNING]
+> Dieser Mod verändert das Verhalten der Software deines E-Readers. Er steht in
+> keiner Verbindung zu Kobo, Rakuten oder der Tolino-Allianz. Nutzung auf
+> eigene Gefahr.
 
-## Testen
+## Danksagung
 
-Drei Ebenen, von günstig zu gründlich:
+Der Mod steht auf den Schultern von:
 
-1. **Host-Unit-Tests** (`hook/tests/`) — vier Binaries, alle gegen das
-   Host-Qt:
-
-   - `test_wordcount` prüft die pure Logik (Tokenisierung, Script-/Style-
-     Entfernung, Entity-Decoding, Manifest-href-Auflösung, OPF-Spine-Parsing)
-     über `wordcount_logic.h`. Nur QtCore, keine privaten Header.
-   - `test_epub_words` führt das echte `count_epub_words()` — inklusive
-     QZipReader — gegen ein Fixture-EPUB (`fixtures/sample.epub`) aus und
-     prüft die exakten Wortzahlen pro Kapitel. Braucht QtGuis privaten
-     `qzipreader_p.h` und baut nur, wo diese privaten Header installiert sind.
-   - `test_hook_gates` prüft das Verwerfen der Analytics (Tolino vs. Kobo),
-     den begrenzten `isTolino()`-Override und den fail-closed
-     Aktivität-Eintrag.
-   - `test_hook_async` bindet `readingstats.cc` mit gefälschten
-     libnickel-Funktionszeigern ein und prüft die Wortzählung im Hintergrund:
-     Auslieferung, Cache und dass ein zwischenzeitlich geschlossener oder für
-     ein anderes Buch wiederverwendeter View nichts bekommt. Gleiche
-     Voraussetzung (private Header).
-
-   Alle laufen mit:
-
-       make -C hook/tests check
-
-2. **Lokaler Symbol- & ABI-Check** (`tools/check-symbols.py`) — verifiziert,
-   dass jedes Hook- (`.sym`) und dlsym-Symbol (`.name`) in der Ziel-Firmware
-   existiert und jede dlsym-Rückgabe-Konvention (sret/Wert vs. Referenz/
-   Pointer) zur deklarierten Funktion passt. Genau diese Konvention war der
-   Absturz-Grund beim Buchöffnen: `Content::getMimeType()` gibt `QByteArray&`
-   zurück, nicht `QByteArray` per Wert. Außerdem prüft er den fest
-   eingetragenen Offset `ReadingView` → `Content`
-   (`kReadingViewContentOffset`, 0x94 auf 5.18) gegen die Instruktion in
-   `ReadingView::updateWordCounts()`, die ihn berechnet, dass `QWidget` noch
-   die erste Basisklasse von `ReadingView` bei Offset 0 ist (der Hook nutzt
-   den View als `QObject`) und dass der virtuelle Aufruf im Original
-   `supportsReadingStats()` noch auf `hasOnlyImages()` zeigt — über die
-   Typinfo-/vtable-Relocations. Braucht die
-   proprietären Firmware-Dateien:
-
-       python3 tools/check-symbols.py \
-           --source hook/src/readingstats.cc \
-           --defsyms <defsyms.txt> \
-           --firmware <libnickel.so.1.0.0>
-
-   `defsyms.txt` mit `llvm-nm -D --defined-only libnickel.so.1.0.0` erzeugen
-   (Adressen werden über die ELF-Ladesegmente umgerechnet; eine reine
-   Namensliste geht auch, prüft dann aber nur die Existenz und meldet
-   `PARTIAL`).
-   `defsyms.txt` und `libnickel.so.1.0.0` stammen aus der Tolino-Firmware
-   (proprietär) und liegen bewusst nicht im Repo — den lokalen Pfad angeben.
-
-3. **CI** (`.forgejo/workflows/ci.yml`) — führt bei jedem Push die
-   Host-Unit-Tests zweimal aus, gegen Qt5 und gegen Qt6, plus den firmware-unabhängigen
-   Manifest-Check (`tools/check-manifest.py`), der die `.sym`/`.name`-Symbole
-   im Quelltext mit `tools/symbols.txt` (firmware-verifiziert) abgleicht. Der
-   ARM/Qt6-Cross-Compile-Build bleibt lokal (das Toolchain-Image ist ~3,4 GB,
-   zu schwer für Codebergs Runner).
-
-## Installieren
-
-`hook/Kobo.tgz` nach `.kobo/` auf dem Gerät legen und Nickel neu starten.
-Deinstallieren: leere Datei `readingstats_uninstall` im Geräteroot ablegen
-und Nickel neu starten.
-
-## Quellen & Danksagung
-
-Der Mod steht auf den Schultern folgender Projekte:
-
-- **NickelHook** (MIT, Copyright (c) 2020–2025 Patrick Gaskin) — das
-  Hook-Framework, auf dem der Mod aufbaut. Verwendet als Git-Submodul in der
-  `qt6-support`-Fork von **Nico Verbruggen** (`nicoverbruggen/NickelHook`), die
-  Qt-6-Unterstützung ergänzt.
-- **Qt 6.5.2** (The Qt Project / The Qt Company) — `QZipReader` (private API,
-  LGPL-3.0/GPL-2.0/GPL-3.0) zum Lesen der EPUB-Zip-Archive sowie
-  `QXmlStreamReader` und `QRegularExpression` fürs Parsen und Zählen.
-- **strayrose/nickeltc** — Docker-Cross-Compile-Toolchain
-  (`arm-kobo-linux-gnueabihf`, GCC 11.5, Qt 6.5.2), mit der das Hook gebaut wird.
-- **Kobo/Tolino-Firmware** (`libnickel.so.1.0.0`, Tolino 5.18) — das Ziel-Binary.
-  Die internen Klassen (`Device`, `ReadingView`, `Content`, `EventEngine`) wurden
-  per Symbolanalyse und Capstone-Disassembly reverse-engineered.
+- **[NickelHook](https://github.com/pgaskin/NickelHook)** (MIT, © 2020–2025
+  Patrick Gaskin): das Hook-Framework, verwendet in der `qt6-support`-Fork von
+  **Nico Verbruggen** ([nicoverbruggen/NickelHook](https://github.com/nicoverbruggen/NickelHook)),
+  die Qt-6-Unterstützung ergänzt.
+- **Qt 6.5.2** (The Qt Project / The Qt Company): `QZipReader` (private API,
+  LGPL-3.0/GPL-2.0/GPL-3.0) zum Lesen der EPUBs sowie `QXmlStreamReader` und
+  `QRegularExpression`.
+- **strayrose/nickeltc**: die Docker-Cross-Compile-Toolchain
+  (`arm-kobo-linux-gnueabihf`, GCC 11.5, Qt 6.5.2).
+- **Kobo/Tolino-Firmware** (`libnickel.so.1.0.0`, Tolino 5.18): das Ziel-Binary.
+  Die internen Klassen (`Device`, `ReadingView`, `Content`, `EventEngine`)
+  wurden per Symbolanalyse und Capstone-Disassembly reverse-engineered.
 
 ## KI-Unterstützung
 
-Dieses Mod wurde mit Hilfe einer KI reverse-engineered und gebaut: die Analyse
-der Firmware-Gatter, das Disassemblieren der Zielklassen und die
-Implementierung der Hooks entstanden im Dialog mit einem KI-Assistenten
-(Hermes Agent, Nous Research). Fachliche Kontrolle, On-Device-Tests und
-Freigabe lagen bei einem Menschen.
+Dieser Mod wurde mit Hilfe von KI-Assistenten reverse-engineered und gebaut.
+Die Analyse der Firmware-Sperren, das Disassemblieren und die erste
+Implementierung entstanden mit Hermes Agent (Nous Research). Das Code-Review,
+die Härtung und die Datenschutz-Korrekturen in v0.2.x entstanden mit Claude
+Code (Anthropic). Fachliche Kontrolle, Tests auf dem Gerät und Freigabe lagen
+bei einem Menschen.
+
+## Lizenz
+
+[MIT](LICENSE)
