@@ -59,7 +59,6 @@
 #include <QString>
 #include <QThreadPool>
 
-#include <cstdarg>
 #include <cstdint>
 #include <dlfcn.h>
 #if defined(__GLIBC__)
@@ -153,41 +152,12 @@ struct CodeRange {
 };
 static CodeRange g_tolino_gates[kTolinoGateCount];
 
-// --- TEMPORARY diagnostics (REVIEW-TODO N7): remove after the device test ---
-#include <atomic>
-#include <cstdio>
-#include <sys/stat.h>
-static void diag(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
-static void diag(const char *fmt, ...) {
-    static std::atomic<int> lines{0};
-    if (lines.fetch_add(1) >= 200) {
-        return;
-    }
-    mkdir("/mnt/onboard/.adds/NickelReadingStats", 0755);
-    FILE *f = std::fopen("/mnt/onboard/.adds/NickelReadingStats/debug.log", "a");
-    if (!f) {
-        return;
-    }
-    va_list args;
-    va_start(args, fmt);
-    std::vfprintf(f, fmt, args);
-    va_end(args);
-    std::fputc('\n', f);
-    std::fclose(f);
-}
-// --- end TEMPORARY ---
-
 static bool resolve_code_range(const char *symbol, CodeRange *out) {
 #if defined(__GLIBC__)
     void *addr = dlsym(RTLD_DEFAULT, symbol);
     Dl_info info;
     void *extra = nullptr;
-    const int found = addr ? dladdr1(addr, &info, &extra, RTLD_DL_SYMENT) : 0;
-    diag("resolve %s: dlsym=%p dladdr1=%d sym=%p fname=%s sname=%s saddr=%p size=%u",
-         symbol, addr, found, extra, found ? info.dli_fname : "-",
-         found && info.dli_sname ? info.dli_sname : "-", found ? info.dli_saddr : nullptr,
-         extra ? static_cast<unsigned>(static_cast<const ElfW(Sym) *>(extra)->st_size) : 0u);
-    if (!addr || !found || !extra) {
+    if (!addr || !dladdr1(addr, &info, &extra, RTLD_DL_SYMENT) || !extra) {
         return false;
     }
     const ElfW(Sym) *sym = static_cast<const ElfW(Sym) *>(extra);
@@ -447,18 +417,8 @@ _nh_Device__supportsReadingLife(Device *device) {
 // gate reaches it through the PLT/GOT jump, so LR still points into the gate.
 extern "C" __attribute__((visibility("default"), noinline)) bool
 _nh_Device__isTolino(Device *device) {
-    const uintptr_t ra = reinterpret_cast<uintptr_t>(__builtin_return_address(0));
-    if (g_force_kobo_session) {  // TEMPORARY diagnostics
-        static std::atomic<int> logged{0};
-        if (logged.fetch_add(1) < 40) {
-            Dl_info info;
-            const int ok = dladdr(reinterpret_cast<void *>(ra), &info);
-            diag("isTolino in window: ra=%p sym=%s saddr=%p gate=%d", reinterpret_cast<void *>(ra),
-                 ok && info.dli_sname ? info.dli_sname : "-", ok ? info.dli_saddr : nullptr,
-                 called_from_tolino_gate(ra) ? 1 : 0);
-        }
-    }
-    if (g_force_kobo_session && called_from_tolino_gate(ra)) {
+    if (g_force_kobo_session &&
+        called_from_tolino_gate(reinterpret_cast<uintptr_t>(__builtin_return_address(0)))) {
         return false;
     }
     // NickelHook sets .out before installing the hook, so this cannot be NULL
@@ -735,13 +695,10 @@ _nh_FeatureSettings__bookSpecificStatsEnabled(FeatureSettings *settings) {
 // Runs after the hooks are installed. Never fails: a gate that cannot be
 // resolved only loses its stats (see g_tolino_gates).
 static int readingstats_init() {
-    diag("--- readingstats_init");
     for (int i = 0; i < kTolinoGateCount; ++i) {
         if (!resolve_code_range(kTolinoGateSymbols[i], &g_tolino_gates[i])) {
             nh_log("could not resolve gate %s; it keeps the Tolino path", kTolinoGateSymbols[i]);
         }
-        diag("gate %d: [%#lx, %#lx)", i, static_cast<unsigned long>(g_tolino_gates[i].begin),
-             static_cast<unsigned long>(g_tolino_gates[i].end));
     }
     return 0;
 }
