@@ -233,8 +233,8 @@ Aufgaben:
   `sendRequest`, `loadQueue` auf dem Tolino stilllegen (echter `isTolino()`-
   Wert, unbekannt = stilllegen). Gerätetest 2026-10-21: Warteschlange von 52
   auf 0 geleert (WLAN aus, also nicht gesendet), bleibt auch mit WLAN und
-  Sync leer; Statistik zählt weiter (Seitenwechsel 122 → 139). Offen:
-  Hotfix-Release v0.2.1.*
+  Sync leer; Statistik zählt weiter (Seitenwechsel 122 → 139). Hotfix
+  v0.2.1 veröffentlicht (2026-10-21, Tag auf e0685d7).*
 
 Geräte-Auswertung N1 (2026-10-19): Aus der Datenbank nicht entscheidbar, weil
 die Kapitel-Wortzahlen nur im Speicher liegen (`ReadingView+0xa4`). Seit H3 hat
@@ -275,3 +275,4 @@ für sideloaded EPUBs (14 Sitzungen, 3017 s, Start/Ende paarweise).
 - 2026-10-20: N7 Schritte 1–4 auf fix/istolino-caller-scope umgesetzt; Gerätetest offen.
 - 2026-10-21: Gerätetest N7 ok (initialize als Sperrfunktion). N8: GA-Hits entdeckt, Requester-Hooks umgesetzt; Diagnose-Commit zurückgenommen.
 - 2026-10-21: Gerätetest N8 ok (GA-Warteschlange leer, auch mit WLAN). PR für fix/istolino-caller-scope.
+- 2026-10-21: PR #4 gemergt (e0685d7). Release v0.2.1 veröffentlicht (Asset SHA-256 c896532b…, Download geprüft). v0.2.0-Beschreibung mit Warnhinweis „bitte auf v0.2.1 aktualisieren (Datenschutz)“ versehen. Release v0.1.0 samt Asset gelöscht, Git-Tag v0.1.0 bleibt.
