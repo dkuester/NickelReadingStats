@@ -27,6 +27,18 @@ static bool g_tolino_seen_in_callee = false;
 
 static bool fake_isTolino(Device *) { return g_is_tolino; }
 
+static int g_ga_api = 0, g_ga_send = 0, g_ga_load = 0;
+static void fake_ga_apiRequest(void *, const void *, bool) { ++g_ga_api; }
+static void fake_ga_sendRequest(void *, const void *) { ++g_ga_send; }
+static void fake_ga_loadQueue(void *, void *) { ++g_ga_load; }
+
+static void ga_all()
+{
+    _nh_GoogleAnalyticsRequester__apiRequest(nullptr, nullptr, true);
+    _nh_GoogleAnalyticsRequester__sendRequest(nullptr, nullptr);
+    _nh_GoogleAnalyticsRequester__loadQueue(nullptr, nullptr);
+}
+
 // Stands in for code the gate calls further down, e.g. EventEngine::
 // initialize() or Affiliate::getDeviceAffiliate(): it must keep getting the
 // real answer even inside the window.
@@ -69,6 +81,25 @@ int main()
     Device__isTolino = fake_isTolino;
     EventEngine__fireAnalyticsEvent = fake_fireAnalyticsEvent;
     EventEngine__fireEventSlot = fake_fireEventSlot;
+
+    GoogleAnalyticsRequester__apiRequest = fake_ga_apiRequest;
+    GoogleAnalyticsRequester__sendRequest = fake_ga_sendRequest;
+    GoogleAnalyticsRequester__loadQueue = fake_ga_loadQueue;
+
+    // --- Google Analytics requester --------------------------------------------
+    ga_all();  // nobody has asked isTolino() yet
+    check("GA: dropped while the device type is unknown", g_ga_api + g_ga_send + g_ga_load == 0);
+    g_is_tolino = true;
+    _nh_Device__isTolino(nullptr);  // Nickel asks once, outside any window
+    ga_all();
+    check("GA: dropped on a Tolino (new hit, upload, restored queue)",
+          g_ga_api + g_ga_send + g_ga_load == 0);
+    g_is_tolino = false;
+    _nh_Device__isTolino(nullptr);
+    ga_all();
+    check("GA: passed through on a Kobo", g_ga_api == 1 && g_ga_send == 1 && g_ga_load == 1);
+    g_is_tolino = true;
+    _nh_Device__isTolino(nullptr);
 
     // --- gate range logic ------------------------------------------------------
     g_tolino_gates[0] = CodeRange{0x1000, 0x1100};

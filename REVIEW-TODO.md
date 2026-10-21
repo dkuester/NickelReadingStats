@@ -218,6 +218,19 @@ Aufgaben:
   (`dladdr1`, st_size); `check-symbols.py` prüft mit denselben Grenzen.
   Offen: Gerätetest (Schritt 5).*
 
+- [~] **N8** Google Analytics über `initialize()` (2026-10-21). *Gerätetest des
+  engeren Overrides: Statistik ok (Seitenwechsel 112 → 122, Sitzungen +2),
+  aber `.kobo/Kobo/Analytics.conf` enthielt 52 GA-Hits an
+  `ssl.google-analytics.com` (u. a. OpenContent/LeaveContent, 5× `book_id`,
+  Akku, Schriftart). Ursache: `initialize()` muss den Kobo-Zweig nehmen
+  (sonst keine Statistik), und der erzeugt `GoogleAnalyticsHandler`; dessen
+  Hits laufen an `fireAnalyticsEvent()` vorbei. **Betrifft auch v0.2.0 und
+  v0.1.0**; bei N4/N5 wurde nur die DB-Tabelle geprüft. Gegenmaßnahme auf
+  `fix/istolino-caller-scope`: `GoogleAnalyticsRequester::apiRequest`,
+  `sendRequest`, `loadQueue` auf dem Tolino stilllegen (echter `isTolino()`-
+  Wert, unbekannt = stilllegen). Offen: Gerätetest (Warteschlange leer und
+  bleibt leer, auch mit WLAN), danach Hotfix-Release.*
+
 Geräte-Auswertung N1 (2026-10-19): Aus der Datenbank nicht entscheidbar, weil
 die Kapitel-Wortzahlen nur im Speicher liegen (`ReadingView+0xa4`). Seit H3 hat
 die Liste genau so viele Einträge wie die Spine, und `chapterIndex()` liegt
@@ -255,3 +268,4 @@ für sideloaded EPUBs (14 Sitzungen, 3017 s, Start/Ende paarweise).
 - 2026-10-20: Gerätetest N1/N6 bestanden (Statistikseite ok, Seitenwechsel +25, 1,1 Seiten/min, Analytics leer).
 - 2026-10-20: Release v0.2.0 (Tag auf cdcaa94, Asset SHA-256 f36cb4fc…). N7 (Testerbericht) aufgenommen; Branch fix/istolino-caller-scope für den engeren Override.
 - 2026-10-20: N7 Schritte 1–4 auf fix/istolino-caller-scope umgesetzt; Gerätetest offen.
+- 2026-10-21: Gerätetest N7 ok (initialize als Sperrfunktion). N8: GA-Hits entdeckt, Requester-Hooks umgesetzt; Diagnose-Commit zurückgenommen.

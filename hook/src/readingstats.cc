@@ -29,8 +29,9 @@
  *   - (3) run the EventEngine calls with isTolino() reporting false on the
  *     calling thread only, for the duration of the call (ForceKoboScope),
  *     and only to the gate functions themselves, not to what they call
- *     and drop analytics events on a Tolino (stock Tolino queues none; the
- *     opened Kobo paths would upload title, author and reading time)
+ *     and drop analytics events and Google Analytics hits on a Tolino
+ *     (stock Tolino creates none; the opened Kobo paths would upload title,
+ *     author, book ID and reading time)
  *   - (4) mirror the original supportsReadingStats() for plain epubs: same
  *     accessibility, image-only and fixed-layout guards, kepub check swapped
  *     for epub. hasValidReadingStats() is NOT hooked: it calls
@@ -59,6 +60,7 @@
 #include <QString>
 #include <QThreadPool>
 
+#include <atomic>
 #include <cstdint>
 #include <dlfcn.h>
 #if defined(__GLIBC__)
@@ -96,6 +98,13 @@ static void (*EventEngine__fireEventSlot)(void *, void *, void *, void *);
 // attributes, and a bool passed on the stack (read by `ldrb [sp, #0xd0]` in
 // its 5.18 prologue). Returns void.
 static void (*EventEngine__fireAnalyticsEvent)(void *, Device *, void *, void *, bool);
+// GoogleAnalyticsRequester (member functions, all void on 5.18):
+// apiRequest(QUrlQuery const&, bool) takes every new GA/GA4 hit from
+// GoogleAnalyticsHandler, sendRequest(QUrl const&) uploads one queued hit,
+// loadQueue(QSettings&) restores the persisted queue (Analytics.conf).
+static void (*GoogleAnalyticsRequester__apiRequest)(void *, const void *, bool);
+static void (*GoogleAnalyticsRequester__sendRequest)(void *, const void *);
+static void (*GoogleAnalyticsRequester__loadQueue)(void *, void *);
 
 // Resolved via dlsym.
 static bool (*ReadingView__isFixedLayout)(ReadingView *);
@@ -183,6 +192,18 @@ static bool called_from_tolino_gate(uintptr_t return_address) {
         }
     }
     return false;
+}
+
+// The device's real isTolino() answer, recorded by the isTolino() hook the
+// first time Nickel asks (early at boot): -1 unknown, 0 Kobo, 1 Tolino. Used
+// where no Device is at hand (the Google Analytics requester).
+static std::atomic<int> g_real_is_tolino{-1};
+
+// Kobo's analytics must not run on a Tolino; while the answer is unknown,
+// treat the device as a Tolino (fail closed: at worst a Kobo loses a few
+// boot-time analytics hits).
+static bool suppress_kobo_analytics() {
+    return g_real_is_tolino.load(std::memory_order_relaxed) != 0;
 }
 
 // Sets g_force_kobo_session for one scope and restores the previous value
@@ -300,6 +321,30 @@ static struct nh_hook NickelReadingStatsHook[] = {
         .lib     = "libnickel.so.1.0.0",
         .out     = nh_symoutptr(EventEngine__fireAnalyticsEvent),
         .desc    = "Drop analytics events on Tolino (stock Tolino queues none)",
+        .optional = true,
+    },
+    {
+        .sym     = "_ZN24GoogleAnalyticsRequester10apiRequestERK9QUrlQueryb",
+        .sym_new = "_nh_GoogleAnalyticsRequester__apiRequest",
+        .lib     = "libnickel.so.1.0.0",
+        .out     = nh_symoutptr(GoogleAnalyticsRequester__apiRequest),
+        .desc    = "Drop Google Analytics hits on Tolino (stock Tolino creates none)",
+        .optional = true,
+    },
+    {
+        .sym     = "_ZN24GoogleAnalyticsRequester11sendRequestERK4QUrl",
+        .sym_new = "_nh_GoogleAnalyticsRequester__sendRequest",
+        .lib     = "libnickel.so.1.0.0",
+        .out     = nh_symoutptr(GoogleAnalyticsRequester__sendRequest),
+        .desc    = "Never upload queued Google Analytics hits on Tolino",
+        .optional = true,
+    },
+    {
+        .sym     = "_ZN24GoogleAnalyticsRequester9loadQueueER9QSettings",
+        .sym_new = "_nh_GoogleAnalyticsRequester__loadQueue",
+        .lib     = "libnickel.so.1.0.0",
+        .out     = nh_symoutptr(GoogleAnalyticsRequester__loadQueue),
+        .desc    = "Do not restore a Google Analytics queue on Tolino (clears it on save)",
         .optional = true,
     },
     {0},
@@ -426,7 +471,9 @@ _nh_Device__isTolino(Device *device) {
     if (!Device__isTolino) {
         return true;
     }
-    return Device__isTolino(device);
+    const bool tolino = Device__isTolino(device);
+    g_real_is_tolino.store(tolino ? 1 : 0, std::memory_order_relaxed);
+    return tolino;
 }
 
 // startReadingSession/endReadingSession call isTolino() themselves and skip
@@ -504,6 +551,39 @@ _nh_EventEngine__fireAnalyticsEvent(void *engine, Device *device, void *name, vo
         return;
     }
     EventEngine__fireAnalyticsEvent(engine, device, name, attrs, flag);
+}
+
+// Google Analytics: EventEngine::initialize() has to take its non-Tolino
+// branch for the stats to work (see kTolinoGateSymbols), and that branch also
+// creates Kobo's GoogleAnalyticsHandler. Its hits do not go through
+// fireAnalyticsEvent(): they are queued in Analytics.conf and uploaded to
+// ssl.google-analytics.com. Measured on Tolino 5.18 (REVIEW-TODO N8): 52 hits
+// queued, incl. OpenContent/LeaveContent with book_id. A stock Tolino never
+// creates the handler, so on a Tolino the requester is silenced at all three
+// points: no new hit, no upload, no restored queue (the next save writes an
+// empty one, which removes hits queued by earlier versions of this mod).
+extern "C" __attribute__((visibility("default"))) void
+_nh_GoogleAnalyticsRequester__apiRequest(void *self, const void *query, bool flag) {
+    if (suppress_kobo_analytics() || !GoogleAnalyticsRequester__apiRequest) {
+        return;
+    }
+    GoogleAnalyticsRequester__apiRequest(self, query, flag);
+}
+
+extern "C" __attribute__((visibility("default"))) void
+_nh_GoogleAnalyticsRequester__sendRequest(void *self, const void *url) {
+    if (suppress_kobo_analytics() || !GoogleAnalyticsRequester__sendRequest) {
+        return;
+    }
+    GoogleAnalyticsRequester__sendRequest(self, url);
+}
+
+extern "C" __attribute__((visibility("default"))) void
+_nh_GoogleAnalyticsRequester__loadQueue(void *self, void *settings) {
+    if (suppress_kobo_analytics() || !GoogleAnalyticsRequester__loadQueue) {
+        return;
+    }
+    GoogleAnalyticsRequester__loadQueue(self, settings);
 }
 
 // Device::supportsActivityInMore() gates the "Activity" entry in the More

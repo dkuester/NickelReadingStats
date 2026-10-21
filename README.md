@@ -34,6 +34,7 @@ The mod hooks:
 | `EventEngine::fireEvent()` | `_ZN11EventEngine9fireEventEPKcRK6Vol…` | Run the page-turn event entry on Tolino |
 | `EventEngine::fireEventSlot()` | `_ZN11EventEngine13fireEventSlotE10QByt…` | Record page turns/events on Tolino (pages per minute) |
 | `EventEngine::fireAnalyticsEvent()` | `_ZN11EventEngine18fireAnalyticsEvent…` | Drop analytics events on Tolino (see "Privacy") |
+| `GoogleAnalyticsRequester::apiRequest/sendRequest/loadQueue()` | `_ZN24GoogleAnalyticsRequester…` | Silence Kobo's Google Analytics on Tolino (see "Privacy") |
 | `ReadingView::supportsReadingStats()` | `_ZNK11ReadingView20supportsReadingStatsEv` | Allow stats for regular EPUBs |
 | `ReadingView::updateWordCounts()` | `_ZN11ReadingView16updateWordCountsEv` | Retrofit word counting for regular EPUBs (see below) |
 | `ReadingView::mergedTOCAndSpineIndex()` | `_ZN11ReadingView22mergedTOCAndSpineIndexEv` | Use the raw spine index so read chapters are highlighted |
@@ -84,6 +85,15 @@ hook on `EventEngine::fireAnalyticsEvent()` therefore drops every analytics
 event on a Tolino, matching the stock behaviour; the reading-life data that
 feeds the stats is stored separately on the device and is unaffected. On a
 Kobo, analytics are left alone.
+
+The stats also need `EventEngine::initialize()` to take its Kobo branch, and
+that branch creates Kobo's Google Analytics requester. Its hits (reading
+events, screens, battery, book IDs) bypass `fireAnalyticsEvent()`: they are
+queued in `.kobo/Kobo/Analytics.conf` and sent to `ssl.google-analytics.com`.
+On a Tolino the mod silences the requester completely: no new hit, no upload,
+and the queue is not restored at startup, so the next save empties it. This
+also removes hits queued by v0.2.0 and earlier, as long as they have not been
+uploaded yet.
 
 ## Word counting for regular EPUBs
 
