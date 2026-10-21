@@ -3,7 +3,7 @@
 **Kobo's reading statistics on your Tolino, for sideloaded EPUBs too.**
 
 [![Release](https://img.shields.io/gitea/v/release/hortizept/nickel-reading-stats?gitea_url=https%3A%2F%2Fcodeberg.org&label=release)](https://codeberg.org/hortizept/nickel-reading-stats/releases)
-[![CI](https://codeberg.org/hortizept/nickel-reading-stats/badges/workflows/ci.yml/badge.svg)](https://codeberg.org/hortizept/nickel-reading-stats/actions?workflow=ci.yml)
+[![CI](https://codeberg.org/hortizept/nickel-reading-stats/badges/workflows/ci.yml/badge.svg?branch=main)](https://codeberg.org/hortizept/nickel-reading-stats/actions?workflow=ci.yml)
 [![Firmware](https://img.shields.io/badge/firmware-5.18%2B%20(Qt%206)-informational)](#compatibility)
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
