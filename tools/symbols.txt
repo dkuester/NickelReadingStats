@@ -1,6 +1,6 @@
 # Verified hook/dlsym symbols this mod depends on.
 # Each name was confirmed to exist in the Tolino 5.18 firmware (libnickel.so.1.0.0)
-# via tools/check-symbols.py. Do NOT add a name here without running that check
+# via tools/check-symbols.py, and in Kobo 5.18.270971 and 6.0.276679. Do NOT add a name here without running that check
 # first — CI fails if the source's symbols drift from this list.
 _ZN11EventEngine9fireEventEPKcRK6VolumeRK4QMapI7QString8QVariantE
 _ZN11EventEngine18fireAnalyticsEventERK6DeviceRK7QStringRK4QMapIS3_8QVariantEb

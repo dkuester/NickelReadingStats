@@ -121,16 +121,33 @@ Aufgaben:
   `bookSpecificStatsEnabled` wird auf beiden erzwungen (gewollt).*
 - [x] **KC2** Nicht-essenzielle Hooks als `optional` markieren, damit ein auf
   Kobo fehlendes Symbol nicht den ganzen Mod abschaltet.
-- [!] **KC3** Symbole, Return-Konventionen und Offset `0x94` gegen eine
-  **Kobo**-5.x-`libnickel` prüfen (`check-symbols.py`).
-  *Blockiert: Kobo-5.x-Firmware liegt lokal nicht vor. Stand 2026-10-19:
-  Kobos Update-API (`UpgradeCheck`, Affiliates kobo/beta/fnac/rakutenbooks)
-  und pgaskins Firmware-Liste bieten für den Clara BW N365 (ID …391) nur bis
-  4.46.23836 (Aug. 2026, Qt5) an, für keine Geräte-ID eine 5.x. Einziger Weg:
-  `libnickel.so.1.0.0` von einem Gerät ziehen, auf dem bereits 5.x läuft.*
+- [x] **KC3** Symbole, Return-Konventionen und Offset `0x94` gegen eine
+  **Kobo**-5.x-`libnickel` prüfen (`check-symbols.py`). *Erledigt 2026-10-21
+  gegen zwei vom User bereitgestellte Kobo-Bibliotheken: 5.18.270971
+  (BuildID `5bfd31d7…`, intern `5.00.270974`) und 6.0.276679 (BuildID
+  `1740d695…`, intern `5.00.276691`). Beide ARM32, Qt 6.5
+  (`qt_version_tag@Qt_6.5`, kein `@Qt_5`), dieselben `NEEDED` wie die
+  Tolino-Referenz `bcfe1a2b…`. Ob es Kobo- und nicht Tolino-Builds sind, lässt
+  sich aus der Bibliothek allein nicht belegen (ein Binary für beide); die
+  Herkunft stammt vom User. `check-symbols.py` für beide grün (15 Hooks,
+  9 dlsyms, 0 Probleme): alle 24 Symbole vorhanden, alle Return-Konventionen
+  und void/value wie deklariert, `ReadingView`-Basis `QWidget` bei 0, virtueller
+  Aufruf = `hasOnlyImages()`, die fünf Sperrfunktionen rufen `isTolino()` je
+  einmal per `bl`/`blx` und keinen Tail-Caller (einziger weiterhin
+  `tolinoDemoModeEnabled()`), Offset `0x94`. Unterschiede zur Tolino-Referenz
+  nur in Adressen. In 6.0 ist `fireEvent()` kleiner (0x474 statt 0x504):
+  gleiche Aufrufkette, nur ruft der Compiler die `QByteArray`-Destruktoren
+  jetzt über `QArrayDataPointer<char>::~QArrayDataPointer` statt sie
+  einzubetten. Direkte Callees aller Sperrfunktionen und der übrigen
+  gehookten Funktionen sind in allen drei Builds gleich; von den
+  Sperrfunktionen aus erreichbare `isTolino()`-Aufrufer weiterhin nur
+  `Affiliate::getDeviceAffiliate()` und `DictionaryFileManager::getAll()`.
+  Keine Codeänderung nötig.*
 - [!] **KC4** Smoke-Test auf einem Kobo mit 5.x. *Blockiert: kein Gerät mit 5.x.*
-- [ ] **KC5** README/Beschreibung: Kobo 5.18+ erst nach KC3/KC4 als
-  unterstützt nennen.
+- [~] **KC5** README/Beschreibung: Kobo 5.18+ erst nach KC3/KC4 als
+  unterstützt nennen. *Nach KC3 (2026-10-21): Kompatibilitätstabelle und
+  Hinweise führen Kobo 5.18/6.0 als „symbolgeprüft, auf Gerät ungetestet“.
+  „Unterstützt“ erst nach KC4.*
 
 ## Neue Befunde während der Umsetzung
 
@@ -277,3 +294,4 @@ für sideloaded EPUBs (14 Sitzungen, 3017 s, Start/Ende paarweise).
 - 2026-10-21: Gerätetest N8 ok (GA-Warteschlange leer, auch mit WLAN). PR für fix/istolino-caller-scope.
 - 2026-10-21: [PR #4](https://codeberg.org/hortizept/nickel-reading-stats/pulls/4) gemergt (e0685d7). Release v0.2.1 veröffentlicht (Asset SHA-256 c896532b…, Download geprüft). v0.2.0-Beschreibung mit Warnhinweis „bitte auf v0.2.1 aktualisieren (Datenschutz)“ versehen. Release v0.1.0 samt Asset gelöscht, Git-Tag v0.1.0 bleibt.
 - 2026-10-21: Umzug von Codeberg nach GitHub (https://github.com/dkuester/NickelReadingStats): Historie, Tags und Releases v0.2.0/v0.2.1 übertragen; CI auf GitHub Actions mit ARM-Cross-Build im Qt-6-Toolchain-Image, automatische Releases per Tag (`.github/release-notes/<tag>.md`). PR-Nummern bis #6 beziehen sich auf das archivierte Codeberg-Repo (https://codeberg.org/hortizept/nickel-reading-stats).
+- 2026-10-21: KC3 erledigt (Kobo 5.18.270971 und 6.0.276679 grün, keine Codeänderung); README als „symbolgeprüft, auf Gerät ungetestet“ (KC5 teilweise).
