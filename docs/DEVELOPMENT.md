@@ -5,15 +5,15 @@ Building, testing and verifying NickelReadingStats. For how the mod works see
 
 ## Building
 
-Prerequisites: Docker and the toolchain image `strayrose/nickeltc`
-(`arm-kobo-linux-gnueabihf`, GCC 11.5, Qt 6.5.2). Clone with submodules, since
+Prerequisites: Docker and the Qt 6 toolchain image `ghcr.io/dkuester/nickelstorygraph-toolchain`
+(`arm-kobo-linux-gnueabihf`, GCC 11.5, Qt 6.5.2), built by NickelStorygraph's CI. Clone with submodules, since
 NickelHook is a submodule:
 
 ```sh
-git clone --recurse-submodules https://codeberg.org/hortizept/nickel-reading-stats.git
-cd nickel-reading-stats/hook
-docker run --rm --volume="$PWD:$PWD" --workdir="$PWD" strayrose/nickeltc make
-docker run --rm --volume="$PWD:$PWD" --workdir="$PWD" strayrose/nickeltc make kobo
+git clone --recurse-submodules https://github.com/dkuester/NickelReadingStats.git
+cd NickelReadingStats/hook
+docker run --rm --volume="$PWD:$PWD" --workdir="$PWD" ghcr.io/dkuester/nickelstorygraph-toolchain make
+docker run --rm --volume="$PWD:$PWD" --workdir="$PWD" ghcr.io/dkuester/nickelstorygraph-toolchain make kobo
 ```
 
 `make kobo` produces `hook/Kobo.tgz` with `imageformats/libreadingstats.so`.
@@ -24,7 +24,8 @@ shows `@Qt_6` symbol versions and no `@Qt_5`.
 > `make clean` deletes `Kobo.tgz`. If a build fails with
 > `arm-kobo-linux-gnueabihf-pkg-config: Command not found`, the image tag on
 > your machine points to a different (Qt 5) toolchain; use the Qt 6 image
-> explicitly.
+> explicitly. `strayrose/nickeltc` on Docker Hub is the Qt 5 NickelTC
+> toolchain (firmware 4.x) and cannot build this mod.
 
 ## Testing
 
@@ -79,17 +80,22 @@ files are proprietary and deliberately not in the repository.
 
 ### 3. CI
 
-`.forgejo/workflows/ci.yml` runs on every push:
+`.github/workflows/ci.yml` runs on every push to `main` and every pull request:
 
 | Job | What |
 |---|---|
 | `wordcount` | Host unit tests against Qt 5 |
 | `wordcount-qt6` | Host unit tests against Qt 6 |
 | `symbols` | `tools/check-manifest.py` (source symbols match the firmware-verified `tools/symbols.txt`) and a syntax check of the tools |
+| `build` | ARM cross build of `Kobo.tgz` in `ghcr.io/dkuester/nickelstorygraph-toolchain`, checks that the library links Qt 6 only, uploads `Kobo.tgz` as an artifact |
 
-`main` is protected: changes go through pull requests, and all three jobs
-must pass before merging. The ARM cross-compile stays local (the toolchain
-image is ~3.5 GB, too heavy for Codeberg's runners).
+`main` is protected: changes go through pull requests, and all four jobs
+must pass before merging.
+
+Releases: a pushed `v*` tag runs `.github/workflows/release.yml`, which runs
+CI, cross-builds `Kobo.tgz` and publishes it with `SHA256SUMS`. The release
+text comes from `.github/release-notes/<tag>.md`, merged to `main` before
+tagging (see [.github/release-notes/README.md](../.github/release-notes/README.md)).
 
 ## Verifying on a device
 

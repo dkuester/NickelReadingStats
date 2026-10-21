@@ -1,13 +1,17 @@
+<div align="center">
+
 # NickelReadingStats
 
 **Kobos Lesestatistik auf dem Tolino, auch für eigene EPUBs.**
 
-[![Release](https://img.shields.io/gitea/v/release/hortizept/nickel-reading-stats?gitea_url=https%3A%2F%2Fcodeberg.org&label=release)](https://codeberg.org/hortizept/nickel-reading-stats/releases)
-[![CI](https://codeberg.org/hortizept/nickel-reading-stats/badges/workflows/ci.yml/badge.svg?branch=main)](https://codeberg.org/hortizept/nickel-reading-stats/actions?workflow=ci.yml)
+[![Release](https://img.shields.io/github/v/release/dkuester/NickelReadingStats?label=release)](https://github.com/dkuester/NickelReadingStats/releases/latest)
+[![CI](https://github.com/dkuester/NickelReadingStats/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/dkuester/NickelReadingStats/actions/workflows/ci.yml)
 [![Firmware](https://img.shields.io/badge/firmware-5.18%2B%20(Qt%206)-informational)](#kompatibilität)
-[![Lizenz](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+[![Lizenz](https://img.shields.io/github/license/dkuester/NickelReadingStats)](LICENSE)
 
-[Installation](#installation) · [Funktionen](#funktionen) · [Datenschutz](#datenschutz) · [Funktionsweise](docs/ARCHITECTURE.md) · [Entwicklung](docs/DEVELOPMENT.md) · [Releases](https://codeberg.org/hortizept/nickel-reading-stats/releases) · [English](README.md)
+[Installation](#installation) · [Funktionen](#funktionen) · [Datenschutz](#datenschutz) · [Funktionsweise](docs/ARCHITECTURE.md) · [Entwicklung](docs/DEVELOPMENT.md) · [Releases](https://github.com/dkuester/NickelReadingStats/releases) · [English](README.md)
+
+</div>
 
 Tolino-Reader laufen mit derselben Software wie Kobo-Geräte, doch Kobos
 „Lesestatistik“ ist auf ihnen abgeschaltet und funktioniert selbst auf einem
@@ -18,7 +22,7 @@ Tolino ein Tolino bleibt: Shop, Cloud, DRM und Datenschutz verhalten sich wie
 bisher.
 
 > [!IMPORTANT]
-> **Noch auf v0.1.0 oder v0.2.0? Bitte auf [v0.2.1](https://codeberg.org/hortizept/nickel-reading-stats/releases/tag/v0.2.1) aktualisieren.**
+> **Noch auf v0.1.0 oder v0.2.0? Bitte auf [v0.2.1](https://github.com/dkuester/NickelReadingStats/releases/tag/v0.2.1) aktualisieren.**
 > In diesen Versionen lief auf dem Tolino Kobos Analytics-Erfassung mit, und
 > Leseereignisse konnten an Google übertragen werden. v0.2.1 unterbindet das
 > und löscht noch nicht gesendete Einträge. Siehe [Datenschutz](#datenschutz).
@@ -56,7 +60,7 @@ bisher.
 > NickelMenu oder andere Mods sind nicht nötig. NickelReadingStats bringt sein
 > eigenes Hook-Framework mit.
 
-1. `Kobo.tgz` aus dem [neuesten Release](https://codeberg.org/hortizept/nickel-reading-stats/releases/latest) herunterladen.
+1. `Kobo.tgz` aus dem [neuesten Release](https://github.com/dkuester/NickelReadingStats/releases/latest) herunterladen.
 2. Das Gerät per USB verbinden und `Kobo.tgz` in den versteckten Ordner
    `.kobo/` kopieren.
 3. Das Gerät auswerfen. Es spielt das Update beim nächsten Start ein; startet
@@ -115,21 +119,23 @@ allen Hooks und dem Aufrufgraphen steht (englisch) in
 ## Entwicklung
 
 ```sh
-git clone --recurse-submodules https://codeberg.org/hortizept/nickel-reading-stats.git
-cd nickel-reading-stats/hook
-docker run --rm --volume="$PWD:$PWD" --workdir="$PWD" strayrose/nickeltc make kobo
+git clone --recurse-submodules https://github.com/dkuester/NickelReadingStats.git
+cd NickelReadingStats/hook
+docker run --rm --volume="$PWD:$PWD" --workdir="$PWD" ghcr.io/dkuester/nickelstorygraph-toolchain make kobo
 make -C tests check            # Host-Unit-Tests
 ```
 
-Bauen, die Teststufen, die Firmware-Prüfungen für Symbole und ABI sowie die CI
+Jeder Tag `v*` baut `Kobo.tgz` in der CI und veröffentlicht es als
+Release. Bauen, die Teststufen, die Firmware-Prüfungen für Symbole und ABI sowie die CI
 sind (englisch) in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) beschrieben.
 
 ## Support
 
 | | |
 |---|---|
-| Fehlermeldungen und Fragen | [Issues](https://codeberg.org/hortizept/nickel-reading-stats/issues). Bitte Gerätemodell, Firmware-Version (`.kobo/version`) und Mod-Version angeben. |
-| Downloads und Änderungen | [Releases](https://codeberg.org/hortizept/nickel-reading-stats/releases) |
+| Fehlermeldungen und Fragen | [Issues](https://github.com/dkuester/NickelReadingStats/issues). Bitte Gerätemodell, Firmware-Version (`.kobo/version`) und Mod-Version angeben. |
+| Downloads und Änderungen | [Releases](https://github.com/dkuester/NickelReadingStats/releases) |
+| Frühere Historie | Issues und Pull-Requests bis v0.2.1 liegen im [archivierten Codeberg-Repo](https://codeberg.org/hortizept/nickel-reading-stats). |
 | Mitwirken | Pull-Requests gegen `main`; die CI muss grün sein. Siehe [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md). |
 
 > [!WARNING]
@@ -148,8 +154,10 @@ Der Mod steht auf den Schultern von:
 - **Qt 6.5.2** (The Qt Project / The Qt Company): `QZipReader` (private API,
   LGPL-3.0/GPL-2.0/GPL-3.0) zum Lesen der EPUBs sowie `QXmlStreamReader` und
   `QRegularExpression`.
-- **strayrose/nickeltc**: die Docker-Cross-Compile-Toolchain
-  (`arm-kobo-linux-gnueabihf`, GCC 11.5, Qt 6.5.2).
+- **Toolchain-Image** [`ghcr.io/dkuester/nickelstorygraph-toolchain`](https://github.com/dkuester/NickelStorygraph/pkgs/container/nickelstorygraph-toolchain)
+  aus NickelStorygraph: die Docker-Cross-Compile-Toolchain
+  (`arm-kobo-linux-gnueabihf`, GCC 11.5, Qt 6.5.2), aufbauend auf
+  [pgaskin/NickelTC](https://github.com/pgaskin/NickelTC).
 - **Kobo/Tolino-Firmware** (`libnickel.so.1.0.0`, Tolino 5.18): das Ziel-Binary.
   Die internen Klassen (`Device`, `ReadingView`, `Content`, `EventEngine`)
   wurden per Symbolanalyse und Capstone-Disassembly reverse-engineered.
