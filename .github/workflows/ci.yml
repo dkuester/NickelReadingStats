@@ -1,0 +1,96 @@
+name: CI
+
+# Pushes to main and pull requests only: a PR branch would otherwise run
+# twice (push + pull_request). release.yml calls this workflow before it
+# publishes a release.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  wordcount:
+    # Host unit tests for the word-counting code (Qt5, no cross toolchain).
+    # test_wordcount exercises wordcount_logic.h (the same pure logic the hook
+    # compiles against Qt6); test_epub_words runs the real count_epub_words()
+    # (incl. QZipReader) against a fixture EPUB, so it also needs QtGui's
+    # private headers (qtbase5-private-dev); test_hook_async drives the
+    # background counting in readingstats.cc with fake libnickel pointers.
+    runs-on: ubuntu-latest
+    container: debian:bookworm
+    steps:
+      # git first: without it actions/checkout falls back to a tarball
+      # download, which cannot fetch the NickelHook submodule.
+      - name: Install Qt5 (incl. private headers) and git
+        run: apt-get update && apt-get install -y --no-install-recommends ca-certificates git qtbase5-dev qtbase5-private-dev pkg-config make g++
+      - uses: actions/checkout@v4
+        with:
+          submodules: true  # test_hook_async includes NickelHook/NickelHook.h
+      - name: Build and run word-count unit tests
+        run: make -C hook/tests check
+
+  wordcount-qt6:
+    # The same host tests against Qt6, the major version the hook is built
+    # for (Debian bookworm ships 6.4; the device has 6.5.2). tests/Makefile
+    # prefers Qt6 when its pkg-config files are present.
+    runs-on: ubuntu-latest
+    container: debian:bookworm
+    steps:
+      - name: Install Qt6 (incl. private headers) and git
+        run: apt-get update && apt-get install -y --no-install-recommends ca-certificates git qt6-base-dev qt6-base-private-dev pkg-config make g++
+      - uses: actions/checkout@v4
+        with:
+          submodules: true  # test_hook_async includes NickelHook/NickelHook.h
+      - name: Build and run word-count unit tests
+        run: make -C hook/tests check
+
+  symbols:
+    # Pure Python, no Docker: catches symbol typos and unverified symbol
+    # additions (drift from the firmware-verified manifest tools/symbols.txt).
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Symbol manifest check
+        run: python3 tools/check-manifest.py --source hook/src/readingstats.cc --manifest tools/symbols.txt
+      - name: Tools syntax check
+        run: python3 -m py_compile tools/nhsyms.py tools/check-symbols.py tools/check-manifest.py
+
+  build:
+    # ARM cross build in NickelStorygraph's Qt 6.5.2 toolchain image
+    # (arm-kobo-linux-gnueabihf). The Qt 5 NickelTC image
+    # (strayrose/nickeltc on Docker Hub) cannot build this.
+    runs-on: ubuntu-latest
+    container: ghcr.io/dkuester/nickelstorygraph-toolchain:latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+          # git describe derives the version from the nearest tag.
+          fetch-depth: 0
+      - name: Trust the checkout
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      - name: Build Kobo.tgz
+        run: |
+          export VERSION="$(git describe --tags --always --dirty)"
+          make -C hook
+          make -C hook kobo
+          tar -tzf hook/Kobo.tgz
+      - name: Check the library links Qt 6 only
+        run: |
+          so=hook/libreadingstats.so
+          syms=$(arm-kobo-linux-gnueabihf-nm -D "$so" 2>/dev/null || arm-linux-gnueabihf-nm -D "$so")
+          if echo "$syms" | grep -q '@Qt_5'; then
+            echo "::error::$so references Qt 5 symbols."
+            exit 1
+          fi
+          echo "$syms" | grep -q '@Qt_6'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Kobo.tgz
+          path: hook/Kobo.tgz
+          if-no-files-found: error

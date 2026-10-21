@@ -265,7 +265,7 @@ für sideloaded EPUBs (14 Sitzungen, 3017 s, Start/Ende paarweise).
 - 2026-10-19: R2 erledigt (Job wordcount-qt6; beide Jobs installieren make/g++/pkg-config explizit).
 - 2026-10-19: Branch nach Codeberg gepusht (Sicherung, kein PR).
 - 2026-10-19: N2, N3 erledigt (hasOnlyImages nachgebildet; Typinfo-/vtable-Checks).
-- 2026-10-19: Gerätetest ok (User). Merge von PR #1, Branch gelöscht. KoboReader.sqlite ausgewertet: H2b teilweise, N4 neu, N1 bewertet.
+- 2026-10-19: Gerätetest ok (User). Merge von [PR #1](https://codeberg.org/hortizept/nickel-reading-stats/pulls/1), Branch gelöscht. KoboReader.sqlite ausgewertet: H2b teilweise, N4 neu, N1 bewertet.
 - 2026-10-20: N4 durchgeführt: Analytics entstehen nur mit Mod (H2b bestätigt). N5 als Gegenmaßnahme aufgenommen. Mod ist derzeit deinstalliert.
 - 2026-10-20: N5 umgesetzt (Branch fix/drop-forced-analytics), Gerätetest steht aus.
 - 2026-10-20: N5 auf dem Gerät bestätigt (keine Analytics, Statistik läuft). N6 aufgenommen.
@@ -275,4 +275,5 @@ für sideloaded EPUBs (14 Sitzungen, 3017 s, Start/Ende paarweise).
 - 2026-10-20: N7 Schritte 1–4 auf fix/istolino-caller-scope umgesetzt; Gerätetest offen.
 - 2026-10-21: Gerätetest N7 ok (initialize als Sperrfunktion). N8: GA-Hits entdeckt, Requester-Hooks umgesetzt; Diagnose-Commit zurückgenommen.
 - 2026-10-21: Gerätetest N8 ok (GA-Warteschlange leer, auch mit WLAN). PR für fix/istolino-caller-scope.
-- 2026-10-21: PR #4 gemergt (e0685d7). Release v0.2.1 veröffentlicht (Asset SHA-256 c896532b…, Download geprüft). v0.2.0-Beschreibung mit Warnhinweis „bitte auf v0.2.1 aktualisieren (Datenschutz)“ versehen. Release v0.1.0 samt Asset gelöscht, Git-Tag v0.1.0 bleibt.
+- 2026-10-21: [PR #4](https://codeberg.org/hortizept/nickel-reading-stats/pulls/4) gemergt (e0685d7). Release v0.2.1 veröffentlicht (Asset SHA-256 c896532b…, Download geprüft). v0.2.0-Beschreibung mit Warnhinweis „bitte auf v0.2.1 aktualisieren (Datenschutz)“ versehen. Release v0.1.0 samt Asset gelöscht, Git-Tag v0.1.0 bleibt.
+- 2026-10-21: Umzug von Codeberg nach GitHub (https://github.com/dkuester/NickelReadingStats): Historie, Tags und Releases v0.2.0/v0.2.1 übertragen; CI auf GitHub Actions mit ARM-Cross-Build im Qt-6-Toolchain-Image, automatische Releases per Tag (`.github/release-notes/<tag>.md`). PR-Nummern bis #6 beziehen sich auf das archivierte Codeberg-Repo (https://codeberg.org/hortizept/nickel-reading-stats).
