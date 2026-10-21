@@ -45,7 +45,7 @@ bisher.
 | Gerät / Firmware | Status |
 |---|---|
 | Tolino, Firmware 5.18+ (Qt 6) | ✅ Getestet (5.18.264769) |
-| Kobo, Firmware 5.x (Qt 6) | ⚠️ Sollte funktionieren, noch nicht geprüft |
+| Kobo, Firmware 5.18 / 6.0 (Qt 6) | ⚠️ Symbolgeprüft (5.18.270971, 6.0.276679), auf Gerät ungetestet |
 | Kobo / Tolino, Firmware 4.x (Qt 5) | ❌ Nicht unterstützt |
 
 | Inhalt | Statistik |
@@ -103,8 +103,10 @@ genau wie ohne Mod. Details (englisch):
   Kapitelbalken.
 - Die Buchstatistik erscheint einen Moment nach dem Öffnen eines Buchs, sobald
   die Wortzählung im Hintergrund fertig ist.
-- Kobo-Geräte mit Firmware 5.x sind noch nicht geprüft. Wer eines hat: Feedback
-  ist sehr willkommen.
+- Auf einem Kobo-Gerät ist der Mod noch nicht getestet. Die Firmware-Prüfung
+  (Symbole, Aufrufkonventionen, Klassenlayout, Offsets) ist für Kobo
+  5.18.270971 und 6.0.276679 grün. Wer einen Kobo hat: Feedback ist sehr
+  willkommen.
 
 ## Funktionsweise
 
@@ -158,7 +160,7 @@ Der Mod steht auf den Schultern von:
   aus NickelStorygraph: die Docker-Cross-Compile-Toolchain
   (`arm-kobo-linux-gnueabihf`, GCC 11.5, Qt 6.5.2), aufbauend auf
   [pgaskin/NickelTC](https://github.com/pgaskin/NickelTC).
-- **Kobo/Tolino-Firmware** (`libnickel.so.1.0.0`, Tolino 5.18): das Ziel-Binary.
+- **Kobo/Tolino-Firmware** (`libnickel.so.1.0.0`; Tolino 5.18, Kobo 5.18 und 6.0): das Ziel-Binary.
   Die internen Klassen (`Device`, `ReadingView`, `Content`, `EventEngine`)
   wurden per Symbolanalyse und Capstone-Disassembly reverse-engineered.
 

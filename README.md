@@ -43,7 +43,7 @@ a Tolino: store, cloud, DRM and privacy behave as before.
 | Device / firmware | Status |
 |---|---|
 | Tolino, firmware 5.18+ (Qt 6) | ✅ Tested (5.18.264769) |
-| Kobo, firmware 5.x (Qt 6) | ⚠️ Expected to work, not verified yet |
+| Kobo, firmware 5.18 / 6.0 (Qt 6) | ⚠️ Symbol-checked (5.18.270971, 6.0.276679), not yet tested on a device |
 | Kobo / Tolino, firmware 4.x (Qt 5) | ❌ Not supported |
 
 | Content | Statistics |
@@ -98,8 +98,9 @@ without the mod. Details: [Privacy internals](docs/ARCHITECTURE.md#privacy-inter
 - A book made of a single large HTML file shows a single chapter bar.
 - The book statistics appear a moment after opening a book, once the
   background word count is done.
-- Kobo devices on firmware 5.x have not been verified yet. If you have one,
-  feedback is very welcome.
+- Kobo devices have not been tested on a device yet. The firmware check
+  (symbols, calling conventions, class layout, offsets) passes for Kobo
+  5.18.270971 and 6.0.276679. If you have a Kobo, feedback is very welcome.
 
 ## How it works
 
@@ -152,7 +153,7 @@ This mod stands on the shoulders of:
   from NickelStorygraph: the Docker cross-compile toolchain
   (`arm-kobo-linux-gnueabihf`, GCC 11.5, Qt 6.5.2), built on
   [pgaskin/NickelTC](https://github.com/pgaskin/NickelTC).
-- **Kobo/Tolino firmware** (`libnickel.so.1.0.0`, Tolino 5.18): the target
+- **Kobo/Tolino firmware** (`libnickel.so.1.0.0`; Tolino 5.18, Kobo 5.18 and 6.0): the target
   binary. The internal classes (`Device`, `ReadingView`, `Content`,
   `EventEngine`) were reverse-engineered via symbol analysis and Capstone
   disassembly.

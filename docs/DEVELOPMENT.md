@@ -63,7 +63,7 @@ make -C hook/tests check
 5. The `isTolino()` gates each call `isTolino()` with `bl`/`blx` and none calls
    a function that tail-calls it (PLT mapped via `R_ARM_JUMP_SLOT`, bounds from
    `.dynsym`).
-6. The hard-coded `ReadingView` → `Content` offset (`0x94` on 5.18) matches
+6. The hard-coded `ReadingView` → `Content` offset (`0x94` on Tolino 5.18 and Kobo 5.18/6.0) matches
    the instruction in `updateWordCounts()` that computes it.
 
 ```sh
