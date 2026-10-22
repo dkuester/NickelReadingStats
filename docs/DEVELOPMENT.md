@@ -12,20 +12,23 @@ NickelHook is a submodule:
 ```sh
 git clone --recurse-submodules https://github.com/dkuester/NickelReadingStats.git
 cd NickelReadingStats/hook
-docker run --rm --volume="$PWD:$PWD" --workdir="$PWD" ghcr.io/dkuester/nickelstorygraph-toolchain make
-docker run --rm --volume="$PWD:$PWD" --workdir="$PWD" ghcr.io/dkuester/nickelstorygraph-toolchain make kobo
+docker run --rm --volume="$PWD:$PWD" --workdir="$PWD" ghcr.io/dkuester/nickelstorygraph-toolchain 'make kobo'
 ```
 
-`make kobo` produces `hook/Kobo.tgz` with `imageformats/libreadingstats.so`.
-A correct build links against Qt 6 only: `llvm-nm -D libreadingstats.so`
-shows `@Qt_6` symbol versions and no `@Qt_5`.
+`make kobo` builds the library and produces `hook/Kobo.tgz` with
+`imageformats/libreadingstats.so`. A correct build links against Qt 6 only:
+`llvm-nm -D libreadingstats.so` shows `@Qt_6` symbol versions and no `@Qt_5`.
 
 > [!NOTE]
-> `make clean` deletes `Kobo.tgz`. If a build fails with
-> `arm-kobo-linux-gnueabihf-pkg-config: Command not found`, the image tag on
-> your machine points to a different (Qt 5) toolchain; use the Qt 6 image
-> explicitly. `strayrose/nickeltc` on Docker Hub is the Qt 5 NickelTC
-> toolchain (firmware 4.x) and cannot build this mod.
+> The image's entrypoint is `/bin/bash -c`, so pass the command as one
+> quoted string. Unquoted, `make kobo` runs a plain `make` and no `Kobo.tgz`
+> is created. The image is amd64 only; on Apple Silicon add
+> `--platform linux/amd64`. `make clean` deletes `Kobo.tgz`.
+
+> [!NOTE]
+> `strayrose/nickeltc` (Docker Hub) is the Qt 5 NickelTC toolchain
+> (`arm-nickel-linux-gnueabihf`, firmware 4.x) and cannot build this mod: the
+> build stops with `arm-kobo-linux-gnueabihf-pkg-config: Command not found`.
 
 ## Testing
 

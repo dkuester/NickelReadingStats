@@ -93,8 +93,6 @@ without the mod. Details: [Privacy internals](docs/ARCHITECTURE.md#privacy-inter
 
 ## Known limitations
 
-- The "time left" estimate can read too low until Nickel has learned your
-  reading speed from a few longer sessions.
 - A book made of a single large HTML file shows a single chapter bar.
 - The book statistics appear a moment after opening a book, once the
   background word count is done.
@@ -116,7 +114,7 @@ the call graph, is in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 ```sh
 git clone --recurse-submodules https://github.com/dkuester/NickelReadingStats.git
 cd NickelReadingStats/hook
-docker run --rm --volume="$PWD:$PWD" --workdir="$PWD" ghcr.io/dkuester/nickelstorygraph-toolchain make kobo
+docker run --rm --volume="$PWD:$PWD" --workdir="$PWD" ghcr.io/dkuester/nickelstorygraph-toolchain 'make kobo'
 make -C tests check            # host unit tests
 ```
 

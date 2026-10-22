@@ -97,8 +97,6 @@ genau wie ohne Mod. Details (englisch):
 
 ## Bekannte Einschränkungen
 
-- Die Restzeit-Schätzung kann zu niedrig ausfallen, bis Nickel deine
-  Lesegeschwindigkeit aus ein paar längeren Sitzungen gelernt hat.
 - Ein Buch, das aus einer einzigen großen HTML-Datei besteht, zeigt nur einen
   Kapitelbalken.
 - Die Buchstatistik erscheint einen Moment nach dem Öffnen eines Buchs, sobald
@@ -123,7 +121,7 @@ allen Hooks und dem Aufrufgraphen steht (englisch) in
 ```sh
 git clone --recurse-submodules https://github.com/dkuester/NickelReadingStats.git
 cd NickelReadingStats/hook
-docker run --rm --volume="$PWD:$PWD" --workdir="$PWD" ghcr.io/dkuester/nickelstorygraph-toolchain make kobo
+docker run --rm --volume="$PWD:$PWD" --workdir="$PWD" ghcr.io/dkuester/nickelstorygraph-toolchain 'make kobo'
 make -C tests check            # Host-Unit-Tests
 ```
 
