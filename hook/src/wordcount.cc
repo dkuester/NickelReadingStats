@@ -4,7 +4,7 @@
  * Reads the epub zip with Qt's private QZipReader (exported by libQt6Gui on
  * firmware 5.18+), locates the OPF, parses the spine order, and counts words in
  * each spine XHTML file. Self-contained: no libnickel internals are touched
- * here — only Qt6Core/Qt6Gui.
+ * here — only Qt6Core/Qt6Gui. DRM-encrypted epubs yield no result.
  */
 
 #include "wordcount.h"
@@ -12,6 +12,8 @@
 
 #include <QByteArray>
 #include <QHash>
+#include <QSet>
+#include <QStringList>
 #include <QXmlStreamReader>
 #include <QtGui/private/qzipreader_p.h>
 
@@ -108,12 +110,28 @@ QList<int> count_epub_words(const QString &epub_path, qint64 max_entry_bytes)
     const int slash = opf_path.lastIndexOf(QLatin1Char('/'));
     const QString opf_dir = slash >= 0 ? opf_path.left(slash) : QString();
 
+    QStringList spine_paths;
+    for (const QString &href : spine_hrefs) {
+        spine_paths.append(join_path(opf_dir, href));
+    }
+
+    // DRM-protected books (Adobe ADEPT, as sold in the Tolino stores) encrypt
+    // their chapters: counting the ciphertext would give nonsense, so report
+    // "no data". Obfuscated fonts alone do not matter.
+    const QSet<QString> encrypted =
+        parse_encrypted_paths(zip.read(QStringLiteral("META-INF/encryption.xml")));
+    for (const QString &path : spine_paths) {
+        if (encrypted.contains(path)) {
+            return counts;
+        }
+    }
+
     // Exactly one entry per spine item, in spine order: Nickel indexes the list
     // by spine position (chapter bars, mergedTOCAndSpineIndex fallback), so a
     // missing, empty or oversized file must count as 0 rather than shift the
     // rest.
-    for (const QString &href : spine_hrefs) {
-        const QByteArray xhtml = zip.read(join_path(opf_dir, href));
+    for (const QString &path : spine_paths) {
+        const QByteArray xhtml = zip.read(path);
         counts.append(xhtml.isEmpty() ? 0 : count_words(decode_xhtml(xhtml)));
     }
     // Nothing readable at all: report "no data" instead of an all-zero list.

@@ -39,7 +39,7 @@ EPUB_CPPFLAGS := $(CPPFLAGS) $(shell pkg-config --cflags $(QT_GUI)) \
 EPUB_LDLIBS   := $(shell pkg-config --libs $(QT_GUI)) $(LDLIBS)
 
 test_epub_words: test_epub_words.cpp ../src/wordcount.cc ../src/wordcount.h \
-                 ../src/wordcount_logic.h fixtures/sample.epub
+                 ../src/wordcount_logic.h fixtures/sample.epub fixtures/encrypted.epub
 	$(CXX) $(CXXFLAGS) $(EPUB_CPPFLAGS) test_epub_words.cpp ../src/wordcount.cc \
 	    -o $@ $(EPUB_LDLIBS)
 

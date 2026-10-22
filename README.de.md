@@ -35,7 +35,7 @@ bisher.
 |---|---|
 | **Buchstatistik** | Eigene Seite im Lesemenü mit Kapitelbalken. Gelesene Kapitel sind hervorgehoben, dazu gibt es Restzeit-Schätzungen. |
 | **Aktivität** | Eintrag „Aktivität“ im Mehr-Menü: Stunden gelesen, Minuten pro Sitzung, Seiten pro Minute. |
-| **Normale EPUBs** | Funktioniert für eigene EPUBs, nicht nur für kepubs. Die Wortzahlen werden im Hintergrund berechnet und pro Buch zwischengespeichert. |
+| **Normale EPUBs** | Funktioniert für eigene EPUBs und im Tolino-Shop gekaufte Bücher, nicht nur für kepubs. Die Wortzahlen werden im Hintergrund berechnet und pro Buch zwischengespeichert. |
 | **Tolino bleibt Tolino** | Kobo-Verhalten wird nur für die wenigen Funktionen freigegeben, die Lesezeit und Seitenwechsel aufzeichnen. Thalia-Konto (oder das eines anderen Buchhändlers), Sync und Downloads bleiben unberührt. |
 | **Datenschutz** | Kobos Analytics und Google Analytics sind auf dem Tolino stillgelegt. |
 | **Fehlertolerant** | Jeder Hook ist optional und fällt sauber weg: Passt etwas nicht zur Firmware, fehlt eine Statistik, nicht das gewohnte Verhalten deines Geräts. |
@@ -57,7 +57,9 @@ bisher.
 | Inhalt | Statistik |
 |---|---|
 | Eigenes EPUB (`.epub`) | ✅ Durch diesen Mod ergänzt |
-| kepub (`.kepub.epub`, Shop-Bücher) | ✅ Unverändert, wie von Nickel bereitgestellt |
+| Tolino-Shop-Buch (EPUB mit Wasserzeichen) | ✅ Durch diesen Mod ergänzt |
+| Tolino-Shop-Buch mit DRM (Adobe, verschlüsselt) | ⚠️ Nur Aktivität: keine Kapitelbalken, keine Restlesezeit |
+| kepub (`.kepub.epub`, Kobo-Shop-Bücher) | ✅ Unverändert, wie von Nickel bereitgestellt |
 | Fixed-Layout-EPUB, reine Bilderbücher, PDF, Comics | ❌ Ausgeschlossen, wie es Nickel auch bei kepubs tut |
 
 ## Installation
@@ -103,6 +105,12 @@ genau wie ohne Mod. Details (englisch):
 
 ## Bekannte Einschränkungen
 
+- Verschlüsselte (DRM-geschützte) Bücher lassen sich nicht auszählen: Dazu
+  müsste der Mod den Kopierschutz umgehen, und das tut er nicht. Lesezeit,
+  Sitzungen und Seiten pro Minute werden für diese Bücher trotzdem erfasst,
+  die Buchstatistik zeigt aber keine Kapitelbalken und keine Restlesezeit.
+  Shop-Bücher mit Wasserzeichen sind nicht verschlüsselt und werden voll
+  unterstützt.
 - Ein Buch, das aus einer einzigen großen HTML-Datei besteht, zeigt nur einen
   Kapitelbalken.
 - Die Buchstatistik erscheint einen Moment nach dem Öffnen eines Buchs, sobald
