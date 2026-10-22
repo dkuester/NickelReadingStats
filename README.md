@@ -33,7 +33,7 @@ a Tolino: store, cloud, DRM and privacy behave as before.
 |---|---|
 | **Book statistics** | Per-book page in the reading menu with chapter bars. Chapters already read are highlighted, and "time left" estimates are shown. |
 | **Activity** | "Activity" entry in the More menu: hours read, minutes per session, pages per minute. |
-| **Regular EPUBs** | Works for sideloaded EPUBs, not just kepubs. Word counts are computed in the background and cached per book. |
+| **Regular EPUBs** | Works for sideloaded EPUBs and books bought in a Tolino store, not just kepubs. Word counts are computed in the background and cached per book. |
 | **Tolino stays Tolino** | Kobo behaviour is enabled only for the few functions that record reading time and page turns. The Thalia (or other bookseller) account, sync and downloads are unaffected. |
 | **Privacy** | Kobo's analytics and Google Analytics are silenced on the Tolino. |
 | **Fails safe** | Every hook is optional and degrades gracefully: if something does not match the firmware, a statistic is missing, not your device's behaviour. |
@@ -49,7 +49,9 @@ a Tolino: store, cloud, DRM and privacy behave as before.
 | Content | Statistics |
 |---|---|
 | Sideloaded EPUB (`.epub`) | ✅ Added by this mod |
-| kepub (`.kepub.epub`, store books) | ✅ Unchanged, as provided by Nickel |
+| Tolino store book (EPUB with watermark) | ✅ Added by this mod |
+| Tolino store book with DRM (Adobe, encrypted) | ⚠️ Activity only: no chapter bars, no "time left" |
+| kepub (`.kepub.epub`, Kobo store books) | ✅ Unchanged, as provided by Nickel |
 | Fixed-layout EPUB, image-only books, PDF, comics | ❌ Excluded, like Nickel does for kepubs |
 
 ## Installation
@@ -93,6 +95,11 @@ without the mod. Details: [Privacy internals](docs/ARCHITECTURE.md#privacy-inter
 
 ## Known limitations
 
+- Encrypted (DRM-protected) books cannot be word-counted: the mod would have
+  to bypass the DRM to read their chapters, and it does not. For these books
+  the reading time, sessions and pages per minute are still recorded, but the
+  book statistics show no chapter bars and no "time left" estimate.
+  Watermarked store books are not encrypted and are fully supported.
 - The "time left" estimate can read too low until Nickel has learned your
   reading speed from a few longer sessions.
 - A book made of a single large HTML file shows a single chapter bar.

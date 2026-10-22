@@ -20,7 +20,8 @@
  *      0 <= mergedTOCAndSpineIndex() < wordCounts.size().
  *   5. ReadingView::updateWordCounts() counts words for kepubs only, and
  *      mergedTOCAndSpineIndex() is never computed for plain epubs, so the
- *      chapter bars and time estimates stay empty.
+ *      chapter bars and time estimates stay empty. Books bought in a Tolino
+ *      store are plain epubs too (not kepubs), so they are affected as well.
  *
  * The hooks below:
  *   - (1) force supportsReadingLife() and bookSpecificStatsEnabled() to true
@@ -40,7 +41,8 @@
  *     counts are in, and it still guards against stats on an empty or
  *     misaligned list (e.g. while the background count is running)
  *   - (5) count plain-epub words ourselves (wordcount.cc, background thread,
- *     cached) and fall back to the raw spine chapterIndex()
+ *     cached) and fall back to the raw spine chapterIndex(); this covers
+ *     sideloaded epubs and Tolino store books (DRM-encrypted ones excepted)
  *
  * Every hook calls the original first and keeps a positive answer, so kepubs
  * and Kobo behaviour are unchanged; on a Kobo the Tolino hooks pass through.
@@ -57,6 +59,7 @@
 #include <QMetaObject>
 #include <QObject>
 #include <QPointer>
+#include <QRegularExpression>
 #include <QString>
 #include <QThreadPool>
 
@@ -264,7 +267,7 @@ static struct nh_hook NickelReadingStatsHook[] = {
         .sym_new = "_nh_ReadingView__updateWordCounts",
         .lib     = "libnickel.so.1.0.0",
         .out     = nh_symoutptr(ReadingView__updateWordCounts),
-        .desc    = "Compute word counts for plain epubs (chapter bars / time estimates)",
+        .desc    = "Compute word counts for plain epubs and Tolino store books (chapter bars / time estimates)",
         .optional = true,
     },
     {
@@ -413,8 +416,8 @@ static const Content *reading_view_content(ReadingView *view) {
         reinterpret_cast<const char *>(view) + kReadingViewContentOffset);
 }
 
-// True for a sideloaded plain epub (not kepub). False if the MIME type
-// cannot be read.
+// True for a plain epub (not kepub): sideloaded, or bought in a Tolino store.
+// False if the MIME type cannot be read.
 static bool is_plain_epub(ReadingView *view) {
     return Content__getMimeType &&
            Content__getMimeType(reading_view_content(view)) == QByteArray("application/epub+zip");
@@ -708,12 +711,34 @@ static void word_counts_done(const QString &path, qint64 size, const QDateTime &
     }
 }
 
+// Where Nickel keeps the file of a store book: the content ID is a UUID, and
+// the epub lies under .kobo/kepub/ without an extension (on a Tolino it is a
+// plain epub despite the folder name). Not const so the host tests can point
+// it at a fixture directory.
+static QString g_store_book_dir = QStringLiteral("/mnt/onboard/.kobo/kepub/");
+
+// The epub file behind a content ID: "file:///mnt/onboard/..." for a
+// sideloaded book, a bare UUID for a store book. Empty for anything else. The
+// UUID check also keeps "/" and ".." out of the store path.
+static QString content_file_path(const QString &id) {
+    if (id.startsWith(QLatin1String("file://"))) {
+        return id.mid(7);  // strip "file://"
+    }
+    static const QRegularExpression uuid(QStringLiteral(
+        "^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$"));
+    if (uuid.match(id).hasMatch()) {
+        return g_store_book_dir + id;
+    }
+    return QString();
+}
+
 // ReadingView::updateWordCounts() is the kepub-only gate that computes the
 // per-chapter word counts behind the chapter bars and time estimates. It
 // early-returns for anything that is not a kepub. We run the original (kepub
-// and instapaper are handled there) and then, for a sideloaded plain epub,
-// count the words ourselves (cached, in the background) and deliver them
-// through gotWordCounts().
+// and instapaper are handled there) and then, for a plain epub (sideloaded or
+// a Tolino store book), count the words ourselves (cached, in the background)
+// and deliver them through gotWordCounts(). A DRM-encrypted store book yields
+// no counts, so it keeps the stock behaviour (no chapter bars).
 extern "C" __attribute__((visibility("default"))) void
 _nh_ReadingView__updateWordCounts(ReadingView *view) {
     if (ReadingView__updateWordCounts) {
@@ -732,10 +757,10 @@ _nh_ReadingView__updateWordCounts(ReadingView *view) {
     }
 
     const QString id = Content__getId(reading_view_content(view), QString());
-    if (!id.startsWith(QLatin1String("file://"))) {
-        return;  // not a sideloaded file (store content uses the kepub path)
+    const QString path = content_file_path(id);
+    if (path.isEmpty()) {
+        return;  // no epub file we know how to find
     }
-    const QString path = id.mid(7);  // strip "file://"
 
     const WordCountWaiter waiter{QPointer<QObject>(reinterpret_cast<QObject *>(view)), view, id};
 

@@ -12,9 +12,14 @@ Spine (expected word counts in brackets):
 
 Every chapter has a <head><title> whose words must NOT be counted.
 
+Also writes encrypted.epub next to it: the same book, but with
+META-INF/encryption.xml listing ch2.xhtml (like an Adobe DRM epub). The
+word counter must report no data for it.
+
 Usage: python3 make_sample_epub.py [output.epub]
 """
 
+import os
 import sys
 import zipfile
 
@@ -59,6 +64,17 @@ def xhtml(body):
             "<body>%s</body>\n</html>\n" % body)
 
 
+ENCRYPTION = """<?xml version="1.0" encoding="UTF-8"?>
+<encryption xmlns="urn:oasis:names:tc:opendocument:xmlns:container"
+            xmlns:enc="http://www.w3.org/2001/04/xmlenc#">
+  <enc:EncryptedData>
+    <enc:EncryptionMethod Algorithm="http://www.w3.org/2001/04/xmlenc#aes128-cbc"/>
+    <enc:CipherData><enc:CipherReference URI="OEBPS/ch2.xhtml"/></enc:CipherData>
+  </enc:EncryptedData>
+</encryption>
+"""
+
+
 def main():
     out = sys.argv[1] if len(sys.argv) > 1 else "sample.epub"
 
@@ -68,10 +84,17 @@ def main():
         info.compress_type = compress
         z.writestr(info, data)
 
+    write_epub(out, add, encrypted=False)
+    write_epub(os.path.join(os.path.dirname(out), "encrypted.epub"), add, encrypted=True)
+
+
+def write_epub(out, add, encrypted):
     with zipfile.ZipFile(out, "w") as z:
         # mimetype must be the first entry and stored uncompressed.
         add(z, "mimetype", "application/epub+zip", zipfile.ZIP_STORED)
         add(z, "META-INF/container.xml", CONTAINER)
+        if encrypted:
+            add(z, "META-INF/encryption.xml", ENCRYPTION)
         add(z, "OEBPS/content.opf", OPF)
         add(z, "OEBPS/ch1.xhtml", xhtml("<p>alpha beta gamma delta</p>"))
         add(z, "OEBPS/ch2.xhtml", xhtml("<p>epsilon zeta</p>"))

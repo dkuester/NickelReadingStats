@@ -9,6 +9,8 @@
 
 #include <QCoreApplication>
 #include <QDeadlineTimer>
+#include <QFile>
+#include <QTemporaryDir>
 #include <QHash>
 #include <QThread>
 #include <cstdio>
@@ -134,7 +136,26 @@ int main(int argc, char **argv)
               return g_got.value(&d).size() == 1 && g_got.value(&e).size() == 1;
           }));
 
-    // 6. A kepub is left to Nickel.
+    // 6. A Tolino store book: the content ID is a UUID, the file lies in the
+    //    store folder without an extension.
+    QTemporaryDir store;
+    const QString uuid = QStringLiteral("4523bb98-46d7-4960-bd4b-7b5a46e9796e");
+    QFile::copy(fixture, store.filePath(uuid));
+    g_store_book_dir = store.path() + QLatin1Char('/');
+    QObject s;
+    g_books.insert(content_of(&s), FakeBook{"application/epub+zip", uuid});
+    _nh_ReadingView__updateWordCounts(&s);
+    check("store book delivered", wait_for([&] { return g_got.value(&s).size() == 1; }));
+    check("store book counts are the real ones",
+          g_got.value(&s).value(0) == (QList<int>{4, 2, 0, 3, 2, 600}));
+
+    // 7. An ID that is neither a file URL nor a UUID is never turned into a path.
+    QObject t;
+    g_books.insert(content_of(&t), FakeBook{"application/epub+zip", QStringLiteral("../../etc/passwd")});
+    _nh_ReadingView__updateWordCounts(&t);
+    check("odd content ID: no count started", g_word_count_waiters.isEmpty() && g_got.value(&t).isEmpty());
+
+    // 8. A kepub is left to Nickel.
     QObject k;
     g_books.insert(content_of(&k), FakeBook{"application/x-kobo-epub+zip", "file://" + fixture});
     _nh_ReadingView__updateWordCounts(&k);

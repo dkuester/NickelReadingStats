@@ -1,7 +1,8 @@
 /*
  * test_wordcount.cpp — host unit tests for the pure word-counting logic.
  *
- * Exercises count_words(), join_path() and parse_spine() against the HOST Qt
+ * Exercises count_words(), join_path(), parse_spine() and
+ * parse_encrypted_paths() against the HOST Qt
  * (Qt5Core or Qt6Core). Deliberately does NOT touch QZipReader (QtGui private
  * API) or the cross toolchain, so it runs anywhere with a Qt dev install.
  */
@@ -133,6 +134,24 @@ int main()
     CHECK_EQ(decode_xhtml(QByteArray("\xFE\xFF" "\0a\0 \0b", 8)), QString("a b"));
     CHECK_EQ(decode_xhtml(QByteArray("\xFF\xFE" "\xFC\0", 4)), QString::fromUtf8("\xC3\xBC"));
     CHECK_EQ(count_words(decode_xhtml(QByteArray("\xFF\xFE" "<\0p\0>\0x\0 \0y\0<\0/\0p\0>\0", 22))), 2);
+
+    // --- parse_encrypted_paths: META-INF/encryption.xml ---
+    {
+        const QByteArray enc =
+            "<encryption xmlns=\"urn:oasis:names:tc:opendocument:xmlns:container\""
+            " xmlns:enc=\"http://www.w3.org/2001/04/xmlenc#\">"
+            "<enc:EncryptedData><enc:CipherData>"
+            "<enc:CipherReference URI=\"OEBPS/Text/Kapitel%201.xhtml\"/>"
+            "</enc:CipherData></enc:EncryptedData>"
+            "<enc:EncryptedData><enc:CipherData>"
+            "<enc:CipherReference URI=\"OEBPS/fonts/a.otf\"/>"
+            "</enc:CipherData></enc:EncryptedData></encryption>";
+        const QSet<QString> paths = parse_encrypted_paths(enc);
+        CHECK_EQ(paths.size(), 2);
+        CHECK(paths.contains(QString("OEBPS/Text/Kapitel 1.xhtml"))); // percent-decoded
+        CHECK(paths.contains(QString("OEBPS/fonts/a.otf")));
+    }
+    CHECK_EQ(parse_encrypted_paths(QByteArray()).size(), 0); // no encryption.xml
 
     std::printf("%d checks, %d failure(s)\n", g_checks, g_failures);
     return g_failures == 0 ? 0 : 1;

@@ -6,6 +6,8 @@
 // so it only runs where those headers are available.
 #include "../src/wordcount.h"
 
+#include <QDir>
+#include <QFileInfo>
 #include <QList>
 #include <QString>
 #include <cstdio>
@@ -49,6 +51,10 @@ int main(int argc, char **argv)
     }
     // A limit below the OPF size yields no result at all.
     check("limit < OPF -> empty", count_epub_words(fixture, 64).size(), 0);
+
+    // A DRM epub (encryption.xml lists a spine item) yields no result.
+    const QString encrypted = QFileInfo(fixture).dir().filePath(QStringLiteral("encrypted.epub"));
+    check("encrypted chapter -> empty", count_epub_words(encrypted).size(), 0);
 
     const QList<int> missing =
         count_epub_words(QStringLiteral("fixtures/does-not-exist.epub"));

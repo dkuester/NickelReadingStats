@@ -127,12 +127,18 @@ other formats stay excluded, and a kepub that Nickel rejects stays rejected.
 `ReadingView::updateWordCounts()` is the kepub-only gate that produces the
 per-chapter word counts behind the chapter bars and the "time left" estimate.
 The hook calls the original first (kepub and Instapaper run unchanged), then
-counts the words for a sideloaded EPUB itself:
+counts the words for a plain EPUB itself, sideloaded or bought in a Tolino
+store (Tolino store books are plain EPUBs, not kepubs):
 
 1. Check the MIME type (`application/epub+zip`) and exclude fixed-layout.
-2. Derive the EPUB file path from the content ID (`file://…`).
+2. Derive the EPUB file path from the content ID: `file://…` for a
+   sideloaded book, a bare UUID for a store book, whose file is
+   `/mnt/onboard/.kobo/kepub/<UUID>` (no extension). Any other ID is skipped.
 3. Open the EPUB with `QZipReader`, locate the OPF
    (`META-INF/container.xml`, fallback `*.opf`) and parse the spine order.
+   If `META-INF/encryption.xml` lists a spine file (Adobe DRM), stop with no
+   result: the chapters are ciphertext. Obfuscated fonts alone do not count.
+   Such a book keeps its Activity data but gets no chapter bars.
 4. For each spine file, decode the XHTML (UTF-8, or UTF-16 by BOM), count only
    the `<body>`, drop comments, scripts and styles, and count tokens that
    contain a letter or digit.

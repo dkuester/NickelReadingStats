@@ -11,6 +11,7 @@
 
 #include <QHash>
 #include <QRegularExpression>
+#include <QSet>
 #include <QString>
 #include <QStringList>
 #include <QUrl>
@@ -203,4 +204,24 @@ inline QStringList parse_spine(const QByteArray &opf)
         }
     }
     return spine;
+}
+
+// Parse META-INF/encryption.xml and return the zip paths of the encrypted
+// entries. CipherReference URIs are relative to the zip root and
+// percent-encoded, like manifest hrefs. Obfuscated fonts are listed here
+// too; the caller only cares whether a spine item is among them.
+inline QSet<QString> parse_encrypted_paths(const QByteArray &encryption_xml)
+{
+    QSet<QString> paths;
+    QXmlStreamReader xml(encryption_xml);
+    while (!xml.atEnd()) {
+        xml.readNext();
+        if (xml.isStartElement() && xml.name() == QLatin1String("CipherReference")) {
+            const QString uri = xml.attributes().value(QLatin1String("URI")).toString();
+            if (!uri.isEmpty()) {
+                paths.insert(join_path(QString(), uri));
+            }
+        }
+    }
+    return paths;
 }
