@@ -22,10 +22,11 @@ Tolino ein Tolino bleibt: Shop, Cloud, DRM und Datenschutz verhalten sich wie
 bisher.
 
 > [!IMPORTANT]
-> **Noch auf v0.1.0 oder v0.2.0? Bitte auf [v0.2.1](https://github.com/dkuester/NickelReadingStats/releases/tag/v0.2.1) aktualisieren.**
+> **Noch auf v0.1.0 oder v0.2.0? Bitte auf das [neueste Release](https://github.com/dkuester/NickelReadingStats/releases/latest) aktualisieren.**
 > In diesen Versionen lief auf dem Tolino Kobos Analytics-Erfassung mit, und
-> Leseereignisse konnten an Google übertragen werden. v0.2.1 unterbindet das
-> und löscht noch nicht gesendete Einträge. Siehe [Datenschutz](#datenschutz).
+> Leseereignisse konnten an Google übertragen werden. Ab v0.2.1 ist das
+> unterbunden, und noch nicht gesendete Einträge werden gelöscht. Siehe
+> [Datenschutz](#datenschutz).
 
 ---
 
@@ -93,7 +94,7 @@ Kobos Reading-Life-Code, den die Statistik braucht, enthält auch Kobos
 Analytics. Ein Tolino ohne Mod führt ihn nie aus. NickelReadingStats lässt den
 Statistik-Teil laufen und hält den Analytics-Teil auf dem Tolino still:
 
-| | Tolino ohne Mod | Mit NickelReadingStats 0.2.1 |
+| | Tolino ohne Mod | Mit NickelReadingStats ab 0.2.1 |
 |---|---|---|
 | Lesestatistik auf dem Gerät gespeichert | — | ✅ |
 | Analytics-Ereignisse (`KoboReader.sqlite`) | keine | keine (verworfen) |

@@ -20,9 +20,9 @@ mod that turns them back on, adds them to regular EPUBs, and keeps your Tolino
 a Tolino: store, cloud, DRM and privacy behave as before.
 
 > [!IMPORTANT]
-> **Using v0.1.0 or v0.2.0? Please update to [v0.2.1](https://github.com/dkuester/NickelReadingStats/releases/tag/v0.2.1).**
+> **Using v0.1.0 or v0.2.0? Please update to the [latest release](https://github.com/dkuester/NickelReadingStats/releases/latest).**
 > Those versions let Kobo's analytics run on the Tolino and could upload
-> reading events to Google. v0.2.1 stops this and deletes entries that have
+> reading events to Google. v0.2.1 and later stop this and deletes entries that have
 > not been sent yet. See [Privacy](#privacy).
 
 ---
@@ -90,7 +90,7 @@ Kobo's reading-life code, which the statistics need, also contains Kobo's
 analytics. A stock Tolino never runs it. NickelReadingStats lets the
 statistics part run and keeps the analytics part silent on a Tolino:
 
-| | Stock Tolino | With NickelReadingStats 0.2.1 |
+| | Stock Tolino | With NickelReadingStats 0.2.1 or later |
 |---|---|---|
 | Reading statistics stored on the device | — | ✅ |
 | Analytics events (`KoboReader.sqlite`) | none | none (dropped) |
