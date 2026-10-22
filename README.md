@@ -38,6 +38,12 @@ a Tolino: store, cloud, DRM and privacy behave as before.
 | **Privacy** | Kobo's analytics and Google Analytics are silenced on the Tolino. |
 | **Fails safe** | Every hook is optional and degrades gracefully: if something does not match the firmware, a statistic is missing, not your device's behaviour. |
 
+<p align="center">
+  <img src="docs/images/book-statistics.png" width="400" alt="Book statistics in the reading menu: time left in this chapter and the next, chapter bars with the chapters already read highlighted, and hours left in the book">
+  <img src="docs/images/activity.png" width="400" alt="Activity page: hours read, minutes per session and pages per minute, plus totals for all titles">
+</p>
+<p align="center"><sub>Book statistics in the reading menu (left) and the Activity page (right) on a Tolino with firmware 5.18, German UI.</sub></p>
+
 ## Compatibility
 
 | Device / firmware | Status |
@@ -93,8 +99,6 @@ without the mod. Details: [Privacy internals](docs/ARCHITECTURE.md#privacy-inter
 
 ## Known limitations
 
-- The "time left" estimate can read too low until Nickel has learned your
-  reading speed from a few longer sessions.
 - A book made of a single large HTML file shows a single chapter bar.
 - The book statistics appear a moment after opening a book, once the
   background word count is done.
@@ -116,7 +120,7 @@ the call graph, is in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 ```sh
 git clone --recurse-submodules https://github.com/dkuester/NickelReadingStats.git
 cd NickelReadingStats/hook
-docker run --rm --volume="$PWD:$PWD" --workdir="$PWD" ghcr.io/dkuester/nickelstorygraph-toolchain make kobo
+docker run --rm --volume="$PWD:$PWD" --workdir="$PWD" ghcr.io/dkuester/nickelstorygraph-toolchain 'make kobo'
 make -C tests check            # host unit tests
 ```
 
