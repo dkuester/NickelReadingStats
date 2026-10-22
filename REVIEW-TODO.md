@@ -252,6 +252,28 @@ Aufgaben:
   auf 0 geleert (WLAN aus, also nicht gesendet), bleibt auch mit WLAN und
   Sync leer; Statistik zählt weiter (Seitenwechsel 122 → 139). Hotfix
   v0.2.1 veröffentlicht (2026-10-21, Tag auf e0685d7).*
+- [x] **N9** Wortzahlen für Tolino-Shop-Bücher (2026-10-22). *Shop-Bücher sind
+  auf dem Tolino plain EPUBs (`application/epub+zip`) unter
+  `.kobo/kepub/<UUID>`, keine kepubs; der `updateWordCounts`-Hook nahm nur
+  `file://`-IDs, daher keine Kapitelbalken/Restzeit. Jetzt wird eine UUID-ID
+  auf diese Datei abgebildet; EPUBs, deren `META-INF/encryption.xml` eine
+  Spine-Datei listet (Adobe-DRM), liefern keine Wortzahlen. Aktivität
+  (Sitzungen, Seitenwechsel) lief für Shop-Bücher schon vorher. Gerätetest
+  ok (Tolino 5.18.264769, „Der wiedergefundene Freund“). PR #3 (GitHub).*
+- [!] **N10** Wortzahlen für DRM-Bücher aus Nickels eigener DB. *Blockiert:
+  wartet auf die vorgemerkte Onleihe-Ausleihe (Adobe-DRM), voraussichtlich
+  in den nächsten Wochen. Befund 2026-10-22: Nickel legt für Shop-Bücher beim
+  Download pro Spine-Eintrag eine Wortzahl ab (`content`, `ContentType = 899`,
+  `VolumeIndex` = Spine-Index, Spalte `WordCount`; z. B. 27 Zeilen für „Der
+  wiedergefundene Freund“, 93 für Earthsea), für sideloaded EPUBs nicht. Die
+  Werte weichen nur leicht von unserer Zählung ab (346 vs. 342). Earthsea ist
+  kein DRM-Buch (kein `encryption.xml`, `isAdobeDrm = 0`, nur
+  Wasserzeichen-ID in `cdp.info`); auf dem Gerät gibt es derzeit kein
+  DRM-Buch. Test: Ausleihe laden, einmal öffnen, dann prüfen, ob
+  `isAdobeDrm = 1`, `encryption.xml` vorhanden und 899-Zeilen mit
+  `WordCount > 0` existieren. Falls ja: im Hook für verschlüsselte Bücher die
+  Wortzahlen aus der DB (oder einer Nickel-API) lesen, ohne den Kopierschutz
+  anzufassen. Falls nein: bleibt dokumentierte Einschränkung (README).*
 
 Geräte-Auswertung N1 (2026-10-19): Aus der Datenbank nicht entscheidbar, weil
 die Kapitel-Wortzahlen nur im Speicher liegen (`ReadingView+0xa4`). Seit H3 hat
@@ -295,3 +317,5 @@ für sideloaded EPUBs (14 Sitzungen, 3017 s, Start/Ende paarweise).
 - 2026-10-21: [PR #4](https://codeberg.org/hortizept/nickel-reading-stats/pulls/4) gemergt (e0685d7). Release v0.2.1 veröffentlicht (Asset SHA-256 c896532b…, Download geprüft). v0.2.0-Beschreibung mit Warnhinweis „bitte auf v0.2.1 aktualisieren (Datenschutz)“ versehen. Release v0.1.0 samt Asset gelöscht, Git-Tag v0.1.0 bleibt.
 - 2026-10-21: Umzug von Codeberg nach GitHub (https://github.com/dkuester/NickelReadingStats): Historie, Tags und Releases v0.2.0/v0.2.1 übertragen; CI auf GitHub Actions mit ARM-Cross-Build im Qt-6-Toolchain-Image, automatische Releases per Tag (`.github/release-notes/<tag>.md`). PR-Nummern bis #6 beziehen sich auf das archivierte Codeberg-Repo (https://codeberg.org/hortizept/nickel-reading-stats).
 - 2026-10-21: KC3 erledigt (Kobo 5.18.270971 und 6.0.276679 grün, keine Codeänderung); README als „symbolgeprüft, auf Gerät ungetestet“ (KC5 teilweise).
+- 2026-10-22: Verdacht „Mod deinstalliert“ geprüft: Mod lief durchgehend (Event-Zeilen, `Analytics.conf` leer); die Screenshots zeigten die Activity-Seite. Keine Wechselwirkung mit NickelStorygraph (gleiche NickelHook-Version, verschiedene Plugin-Keys, keine gemeinsamen Hooks).
+- 2026-10-22: N9 umgesetzt und auf dem Gerät bestätigt (PR #3); N10 aufgenommen (blockiert bis Onleihe-Ausleihe). PR #4 (README-Screenshots, docker-Befehl) gemergt.
