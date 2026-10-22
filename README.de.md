@@ -40,6 +40,12 @@ bisher.
 | **Datenschutz** | Kobos Analytics und Google Analytics sind auf dem Tolino stillgelegt. |
 | **Fehlertolerant** | Jeder Hook ist optional und fällt sauber weg: Passt etwas nicht zur Firmware, fehlt eine Statistik, nicht das gewohnte Verhalten deines Geräts. |
 
+<p align="center">
+  <img src="docs/images/book-statistics.png" width="400" alt="Buchstatistik im Lesemenü: Restzeit für dieses und das nächste Kapitel, Kapitelbalken mit hervorgehobenen gelesenen Kapiteln und verbleibende Stunden im Buch">
+  <img src="docs/images/activity.png" width="400" alt="Seite „Aktivität“: Stunden gelesen, Minuten pro Sitzung und Seiten pro Minute, dazu die Summen über alle Titel">
+</p>
+<p align="center"><sub>Buchstatistik im Lesemenü (links) und Seite „Aktivität“ (rechts) auf einem Tolino mit Firmware 5.18.</sub></p>
+
 ## Kompatibilität
 
 | Gerät / Firmware | Status |

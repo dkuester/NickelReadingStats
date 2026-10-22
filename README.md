@@ -38,6 +38,12 @@ a Tolino: store, cloud, DRM and privacy behave as before.
 | **Privacy** | Kobo's analytics and Google Analytics are silenced on the Tolino. |
 | **Fails safe** | Every hook is optional and degrades gracefully: if something does not match the firmware, a statistic is missing, not your device's behaviour. |
 
+<p align="center">
+  <img src="docs/images/book-statistics.png" width="400" alt="Book statistics in the reading menu: time left in this chapter and the next, chapter bars with the chapters already read highlighted, and hours left in the book">
+  <img src="docs/images/activity.png" width="400" alt="Activity page: hours read, minutes per session and pages per minute, plus totals for all titles">
+</p>
+<p align="center"><sub>Book statistics in the reading menu (left) and the Activity page (right) on a Tolino with firmware 5.18, German UI.</sub></p>
+
 ## Compatibility
 
 | Device / firmware | Status |
