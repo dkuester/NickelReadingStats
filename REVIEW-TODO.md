@@ -319,3 +319,4 @@ für sideloaded EPUBs (14 Sitzungen, 3017 s, Start/Ende paarweise).
 - 2026-10-21: KC3 erledigt (Kobo 5.18.270971 und 6.0.276679 grün, keine Codeänderung); README als „symbolgeprüft, auf Gerät ungetestet“ (KC5 teilweise).
 - 2026-10-22: Verdacht „Mod deinstalliert“ geprüft: Mod lief durchgehend (Event-Zeilen, `Analytics.conf` leer); die Screenshots zeigten die Activity-Seite. Keine Wechselwirkung mit NickelStorygraph (gleiche NickelHook-Version, verschiedene Plugin-Keys, keine gemeinsamen Hooks).
 - 2026-10-22: N9 umgesetzt und auf dem Gerät bestätigt (PR #3); N10 aufgenommen (blockiert bis Onleihe-Ausleihe). PR #4 (README-Screenshots, docker-Befehl) gemergt.
+- 2026-10-22: Release v0.3.0 vorbereitet (Release-Notes `.github/release-notes/v0.3.0.md`; Shop-Bücher N9, Kobo-Prüfung KC3, GitHub-Umzug, README mit Screenshots).
