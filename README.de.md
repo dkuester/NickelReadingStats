@@ -40,6 +40,12 @@ bisher.
 | **Datenschutz** | Kobos Analytics und Google Analytics sind auf dem Tolino stillgelegt. |
 | **Fehlertolerant** | Jeder Hook ist optional und fällt sauber weg: Passt etwas nicht zur Firmware, fehlt eine Statistik, nicht das gewohnte Verhalten deines Geräts. |
 
+<p align="center">
+  <img src="docs/images/book-statistics.png" width="400" alt="Buchstatistik im Lesemenü: Restzeit für dieses und das nächste Kapitel, Kapitelbalken mit hervorgehobenen gelesenen Kapiteln und verbleibende Stunden im Buch">
+  <img src="docs/images/activity.png" width="400" alt="Seite „Aktivität“: Stunden gelesen, Minuten pro Sitzung und Seiten pro Minute, dazu die Summen über alle Titel">
+</p>
+<p align="center"><sub>Buchstatistik im Lesemenü (links) und Seite „Aktivität“ (rechts) auf einem Tolino mit Firmware 5.18.</sub></p>
+
 ## Kompatibilität
 
 | Gerät / Firmware | Status |
@@ -105,8 +111,6 @@ genau wie ohne Mod. Details (englisch):
   die Buchstatistik zeigt aber keine Kapitelbalken und keine Restlesezeit.
   Shop-Bücher mit Wasserzeichen sind nicht verschlüsselt und werden voll
   unterstützt.
-- Die Restzeit-Schätzung kann zu niedrig ausfallen, bis Nickel deine
-  Lesegeschwindigkeit aus ein paar längeren Sitzungen gelernt hat.
 - Ein Buch, das aus einer einzigen großen HTML-Datei besteht, zeigt nur einen
   Kapitelbalken.
 - Die Buchstatistik erscheint einen Moment nach dem Öffnen eines Buchs, sobald
@@ -131,7 +135,7 @@ allen Hooks und dem Aufrufgraphen steht (englisch) in
 ```sh
 git clone --recurse-submodules https://github.com/dkuester/NickelReadingStats.git
 cd NickelReadingStats/hook
-docker run --rm --volume="$PWD:$PWD" --workdir="$PWD" ghcr.io/dkuester/nickelstorygraph-toolchain make kobo
+docker run --rm --volume="$PWD:$PWD" --workdir="$PWD" ghcr.io/dkuester/nickelstorygraph-toolchain 'make kobo'
 make -C tests check            # Host-Unit-Tests
 ```
 
