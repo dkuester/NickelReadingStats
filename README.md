@@ -106,6 +106,9 @@ without the mod. Details: [Privacy internals](docs/ARCHITECTURE.md#privacy-inter
   the reading time, sessions and pages per minute are still recorded, but the
   book statistics show no chapter bars and no "time left" estimate.
   Watermarked store books are not encrypted and are fully supported.
+- The "time left" estimate can read too low, even "0 minutes", until Nickel
+  has learned your reading speed from a few longer sessions. Nickel updates
+  the speed only when a book is opened again.
 - A book made of a single large HTML file shows a single chapter bar.
 - The book statistics appear a moment after opening a book, once the
   background word count is done.
