@@ -112,6 +112,10 @@ genau wie ohne Mod. Details (englisch):
   die Buchstatistik zeigt aber keine Kapitelbalken und keine Restlesezeit.
   Shop-Bücher mit Wasserzeichen sind nicht verschlüsselt und werden voll
   unterstützt.
+- Die Restzeit-Schätzung kann zu niedrig ausfallen, sogar „0 Minuten“, bis
+  Nickel deine Lesegeschwindigkeit aus ein paar längeren Sitzungen gelernt
+  hat. Nickel aktualisiert die Geschwindigkeit erst, wenn ein Buch erneut
+  geöffnet wird.
 - Ein Buch, das aus einer einzigen großen HTML-Datei besteht, zeigt nur einen
   Kapitelbalken.
 - Die Buchstatistik erscheint einen Moment nach dem Öffnen eines Buchs, sobald
